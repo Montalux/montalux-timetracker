@@ -1,0 +1,441 @@
+{% extends "base.html" %}
+{% block title %}Buchen - Montalux Timetracker{% endblock %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-md">
+    <div class="card-body">
+        <h2 class="card-title text-2xl mb-4">Neue Buchung</h2>
+
+        {% if not employees %}
+            <div class="alert alert-warning">
+                <span>Bitte zuerst <a href="{{ url_for('admin') }}" class="link link-primary">Mitarbeiter, Kunden und Leistungen</a> anlegen.</span>
+            </div>
+        {% else %}
+
+        <div role="tablist" class="tabs tabs-boxed mb-6">
+            <a role="tab" class="tab tab-active" id="tab-time" onclick="switchTab('time')">Zeitbuchung</a>
+            <a role="tab" class="tab" id="tab-material" onclick="switchTab('material')">Materialbuchung</a>
+        </div>
+
+        <!-- Zeit-Formular -->
+        <form id="form-time" method="POST" action="{{ url_for('index') }}" onsubmit="return validateDurationWithTimer()">
+            <input type="hidden" name="entry_type" value="time">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Mitarbeiter *</span></label>
+                    <select name="employee_id" class="select select-bordered w-full" required>
+                        <option value="" disabled selected>Mitarbeiter wählen...</option>
+                        {% for emp in employees %}
+                            <option value="{{ emp.id }}">{{ emp.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Kunde *</span></label>
+                    <select name="customer_id" class="select select-bordered w-full" required>
+                        <option value="" disabled selected>Kunde wählen...</option>
+                        {% for cust in customers %}
+                            <option value="{{ cust.id }}">{{ cust.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Leistung *</span></label>
+                    <select name="service_id" class="select select-bordered w-full" required>
+                        <option value="" disabled selected>Leistung wählen...</option>
+                        {% for svc in services %}
+                            <option value="{{ svc.id }}">{{ svc.name }} ({{ "%.2f"|format(svc.price_per_hour) }} CHF/h)</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Datum *</span></label>
+                    <input type="date" name="date" class="input input-bordered w-full" value="{{ today }}" required>
+                </div>
+
+                <div class="form-control w-full md:col-span-2">
+                    <label class="label"><span class="label-text">Dauer *</span></label>
+
+                    <!-- Modus-Toggle -->
+                    <div class="tabs tabs-boxed mb-3 w-fit">
+                        <a class="tab tab-sm tab-active" id="mode-manual" onclick="switchDurationMode('manual')">Manuell</a>
+                        <a class="tab tab-sm" id="mode-timer" onclick="switchDurationMode('timer')">Timer</a>
+                    </div>
+
+                    <!-- Manuell-Modus -->
+                    <div id="duration-manual" class="flex gap-2 flex-wrap items-center">
+                        <label class="btn btn-outline">
+                            <input type="radio" name="duration_minutes" value="5" class="hidden peer">
+                            <span class="peer-checked:font-bold">5 min</span>
+                        </label>
+                        <label class="btn btn-outline">
+                            <input type="radio" name="duration_minutes" value="15" class="hidden peer">
+                            <span class="peer-checked:font-bold">15 min</span>
+                        </label>
+                        <label class="btn btn-outline">
+                            <input type="radio" name="duration_minutes" value="30" class="hidden peer">
+                            <span class="peer-checked:font-bold">30 min</span>
+                        </label>
+                        <label class="btn btn-outline">
+                            <input type="radio" name="duration_minutes" value="60" class="hidden peer">
+                            <span class="peer-checked:font-bold">1 h</span>
+                        </label>
+                        <span class="text-base-content/40">|</span>
+                        <input type="number" id="custom-minutes" class="input input-bordered w-28" min="1" placeholder="min" oninput="setCustomDuration(this.value)">
+                    </div>
+
+                    <!-- Timer-Modus -->
+                    <div id="duration-timer" class="hidden">
+                        <!-- Timer idle -->
+                        <div id="timer-idle" class="flex items-center gap-3">
+                            <button type="button" class="btn btn-success btn-lg" onclick="startTimer()">
+                                ▶ Timer starten
+                            </button>
+                        </div>
+                        <!-- Timer running -->
+                        <div id="timer-running" class="hidden flex items-center gap-4">
+                            <div class="text-3xl font-mono font-bold tabular-nums" id="timer-display">00:00:00</div>
+                            <button type="button" class="btn btn-error" onclick="stopTimer()">
+                                ⏹ Stopp
+                            </button>
+                        </div>
+                        <!-- Timer stopped (result) -->
+                        <div id="timer-result" class="hidden flex items-center gap-3">
+                            <div class="badge badge-lg badge-success gap-1" id="timer-result-text"></div>
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="resetTimer()">Verwerfen</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-control w-full md:col-span-2">
+                    <label class="label"><span class="label-text">Notiz</span></label>
+                    <textarea name="note" class="textarea textarea-bordered w-full" rows="2" placeholder="Optionale Bemerkung..."></textarea>
+                </div>
+            </div>
+
+            <div class="card-actions justify-end mt-6">
+                <button type="submit" class="btn btn-primary">Zeitbuchung speichern</button>
+            </div>
+        </form>
+
+        <!-- Material-Formular -->
+        <form id="form-material" method="POST" action="{{ url_for('index') }}" class="hidden">
+            <input type="hidden" name="entry_type" value="material">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Mitarbeiter *</span></label>
+                    <select name="employee_id" class="select select-bordered w-full" required>
+                        <option value="" disabled selected>Mitarbeiter wählen...</option>
+                        {% for emp in employees %}
+                            <option value="{{ emp.id }}">{{ emp.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Kunde *</span></label>
+                    <select name="customer_id" class="select select-bordered w-full" required>
+                        <option value="" disabled selected>Kunde wählen...</option>
+                        {% for cust in customers %}
+                            <option value="{{ cust.id }}">{{ cust.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control w-full md:col-span-2">
+                    <label class="label"><span class="label-text">Material-Beschreibung *</span></label>
+                    <input type="text" name="description" class="input input-bordered w-full" placeholder="z.B. Papier, Couverts..." required>
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Menge</span></label>
+                    <input type="number" name="quantity" class="input input-bordered w-full" step="0.01" min="0" placeholder="z.B. 10">
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Betrag (CHF)</span></label>
+                    <input type="number" name="amount" class="input input-bordered w-full" step="0.01" min="0" placeholder="z.B. 45.50">
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Datum *</span></label>
+                    <input type="date" name="date" class="input input-bordered w-full" value="{{ today }}" required>
+                </div>
+
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Notiz</span></label>
+                    <textarea name="note" class="textarea textarea-bordered w-full" rows="2" placeholder="Optionale Bemerkung..."></textarea>
+                </div>
+            </div>
+
+            <div class="card-actions justify-end mt-6">
+                <button type="submit" class="btn btn-primary">Materialbuchung speichern</button>
+            </div>
+        </form>
+
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// --- Dauer-Modus Toggle ---
+let currentDurationMode = 'manual';
+
+function switchDurationMode(mode) {
+    currentDurationMode = mode;
+    document.getElementById('mode-manual').classList.toggle('tab-active', mode === 'manual');
+    document.getElementById('mode-timer').classList.toggle('tab-active', mode === 'timer');
+    document.getElementById('duration-manual').classList.toggle('hidden', mode !== 'manual');
+    document.getElementById('duration-timer').classList.toggle('hidden', mode !== 'timer');
+
+    // Werte des anderen Modus löschen wenn gewechselt
+    if (mode === 'timer') {
+        clearButtons();
+        const customHidden = document.getElementById('custom-duration-hidden');
+        if (customHidden) customHidden.remove();
+        document.getElementById('custom-minutes').value = '';
+    } else {
+        // Wenn Timer-Ergebnis da war, das hidden field bleibt bestehen
+    }
+}
+
+// --- Timer ---
+let timerInterval = null;
+
+function getTimerKey() {
+    const empSelect = document.querySelector('#form-time select[name="employee_id"]');
+    const empId = empSelect ? empSelect.value : '';
+    return empId ? `timer_${empId}` : null;
+}
+
+function startTimer() {
+    const empSelect = document.querySelector('#form-time select[name="employee_id"]');
+    if (!empSelect || !empSelect.value) {
+        alert('Bitte zuerst einen Mitarbeiter wählen.');
+        return;
+    }
+
+    const key = getTimerKey();
+    const data = { startedAt: new Date().toISOString(), employeeId: empSelect.value };
+    localStorage.setItem(key, JSON.stringify(data));
+
+    showTimerRunning();
+}
+
+function stopTimer() {
+    const key = getTimerKey();
+    if (!key) return;
+
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+
+    const data = JSON.parse(raw);
+    const elapsed = Date.now() - new Date(data.startedAt).getTime();
+    const minutes = Math.max(1, Math.ceil(elapsed / 60000));
+
+    // Timer aufräumen
+    localStorage.removeItem(key);
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
+    // Hidden field für duration_minutes setzen
+    let hidden = document.getElementById('timer-duration-hidden');
+    if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'duration_minutes';
+        hidden.id = 'timer-duration-hidden';
+        document.getElementById('duration-timer').appendChild(hidden);
+    }
+    hidden.value = minutes;
+
+    // UI aktualisieren
+    document.getElementById('timer-running').classList.add('hidden');
+    document.getElementById('timer-idle').classList.add('hidden');
+    document.getElementById('timer-result').classList.remove('hidden');
+    document.getElementById('timer-result-text').textContent = `${minutes} Minute${minutes !== 1 ? 'n' : ''} erfasst`;
+}
+
+function resetTimer() {
+    const key = getTimerKey();
+    if (key) localStorage.removeItem(key);
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
+    const hidden = document.getElementById('timer-duration-hidden');
+    if (hidden) hidden.remove();
+
+    document.getElementById('timer-running').classList.add('hidden');
+    document.getElementById('timer-result').classList.add('hidden');
+    document.getElementById('timer-idle').classList.remove('hidden');
+}
+
+function showTimerRunning() {
+    document.getElementById('timer-idle').classList.add('hidden');
+    document.getElementById('timer-result').classList.add('hidden');
+    document.getElementById('timer-running').classList.remove('hidden');
+    updateTimerDisplay();
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(updateTimerDisplay, 1000);
+}
+
+function updateTimerDisplay() {
+    const key = getTimerKey();
+    if (!key) return;
+
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+
+    const data = JSON.parse(raw);
+    const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000);
+    const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    const s = String(elapsed % 60).padStart(2, '0');
+    document.getElementById('timer-display').textContent = `${h}:${m}:${s}`;
+}
+
+function restoreTimer() {
+    // Prüfe ob ein Timer für den aktuell gewählten Mitarbeiter läuft
+    const key = getTimerKey();
+    if (!key) return;
+
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+
+    // Timer läuft → automatisch in Timer-Modus wechseln und anzeigen
+    switchDurationMode('timer');
+    showTimerRunning();
+}
+
+function validateDurationWithTimer() {
+    if (currentDurationMode === 'timer') {
+        const timerHidden = document.getElementById('timer-duration-hidden');
+        if (!timerHidden || !timerHidden.value) {
+            // Prüfe ob Timer noch läuft
+            const key = getTimerKey();
+            const raw = key ? localStorage.getItem(key) : null;
+            if (raw) {
+                alert('Bitte zuerst den Timer stoppen.');
+            } else {
+                alert('Bitte den Timer starten und stoppen, um eine Dauer zu erfassen.');
+            }
+            return false;
+        }
+        return true;
+    }
+    return validateDuration();
+}
+
+// Mitarbeiter-Wechsel: Timer-State prüfen
+function onEmployeeChange() {
+    // Timer-Anzeige aktualisieren für den neuen Mitarbeiter
+    if (currentDurationMode === 'timer') {
+        resetTimerUI();
+        restoreTimer();
+    }
+}
+
+function resetTimerUI() {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    const hidden = document.getElementById('timer-duration-hidden');
+    if (hidden) hidden.remove();
+    document.getElementById('timer-running').classList.add('hidden');
+    document.getElementById('timer-result').classList.add('hidden');
+    document.getElementById('timer-idle').classList.remove('hidden');
+}
+
+function switchTab(tab) {
+    const timeTab = document.getElementById('tab-time');
+    const materialTab = document.getElementById('tab-material');
+    const timeForm = document.getElementById('form-time');
+    const materialForm = document.getElementById('form-material');
+
+    if (tab === 'time') {
+        timeTab.classList.add('tab-active');
+        materialTab.classList.remove('tab-active');
+        timeForm.classList.remove('hidden');
+        materialForm.classList.add('hidden');
+    } else {
+        materialTab.classList.add('tab-active');
+        timeTab.classList.remove('tab-active');
+        materialForm.classList.remove('hidden');
+        timeForm.classList.add('hidden');
+    }
+}
+
+// Mitarbeiter merken (localStorage)
+const empSelects = document.querySelectorAll('select[name="employee_id"]');
+const savedEmp = localStorage.getItem('selectedEmployee');
+if (savedEmp) {
+    empSelects.forEach(sel => {
+        if ([...sel.options].some(o => o.value === savedEmp)) {
+            sel.value = savedEmp;
+        }
+    });
+}
+empSelects.forEach(sel => {
+    sel.addEventListener('change', () => {
+        localStorage.setItem('selectedEmployee', sel.value);
+        empSelects.forEach(other => { if (other !== sel) other.value = sel.value; });
+        onEmployeeChange();
+    });
+});
+
+// Timer wiederherstellen falls einer läuft
+restoreTimer();
+
+// Duration: Buttons + freie Eingabe
+const customInput = document.getElementById('custom-minutes');
+const radios = document.querySelectorAll('input[name="duration_minutes"]');
+
+function clearButtons() {
+    radios.forEach(r => {
+        r.closest('label').classList.remove('btn-primary');
+        r.closest('label').classList.add('btn-outline');
+        r.checked = false;
+    });
+}
+
+function setCustomDuration(val) {
+    if (val && parseInt(val) > 0) {
+        clearButtons();
+        // Verstecktes Feld für den custom-Wert setzen
+        let hidden = document.getElementById('custom-duration-hidden');
+        if (!hidden) {
+            hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'duration_minutes';
+            hidden.id = 'custom-duration-hidden';
+            customInput.parentNode.appendChild(hidden);
+        }
+        hidden.value = val;
+    } else {
+        const hidden = document.getElementById('custom-duration-hidden');
+        if (hidden) hidden.remove();
+    }
+}
+
+function validateDuration() {
+    const anyRadio = [...radios].some(r => r.checked);
+    const customVal = document.getElementById('custom-duration-hidden');
+    if (!anyRadio && (!customVal || !customVal.value)) {
+        alert('Bitte eine Dauer wählen oder eingeben.');
+        return false;
+    }
+    return true;
+}
+
+radios.forEach(radio => {
+    radio.addEventListener('change', () => {
+        clearButtons();
+        radio.checked = true;
+        radio.closest('label').classList.add('btn-primary');
+        radio.closest('label').classList.remove('btn-outline');
+        customInput.value = '';
+        const hidden = document.getElementById('custom-duration-hidden');
+        if (hidden) hidden.remove();
+    });
+});
+</script>
+{% endblock %}

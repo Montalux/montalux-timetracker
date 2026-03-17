@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Verwaltung - Montalux Timetracker{% endblock %}
+
+{% block content %}
+<h2 class="text-2xl font-bold mb-6">Verwaltung</h2>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Mitarbeiter -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h3 class="card-title">Mitarbeiter</h3>
+
+            <form method="POST" action="{{ url_for('add_employee') }}" class="flex gap-2 mt-2">
+                <input type="text" name="name" class="input input-bordered input-sm flex-1" placeholder="Neuer Mitarbeiter..." required>
+                <button type="submit" class="btn btn-sm btn-primary">+</button>
+            </form>
+
+            <div class="divider my-2"></div>
+
+            {% if employees %}
+            <div class="space-y-3">
+                {% for emp in employees %}
+                <div class="{{ 'opacity-40' if not emp.active }} border-b border-base-200 pb-3 last:border-0">
+                    <form method="POST" action="{{ url_for('edit_employee', employee_id=emp.id) }}">
+                        <input type="hidden" name="active" value="{{ '1' if emp.active else '0' }}">
+                        <input type="text" name="name" class="input input-bordered input-sm w-full mb-2" value="{{ emp.name }}" required>
+                        <div class="flex justify-end gap-2">
+                            <button type="submit" class="btn btn-ghost btn-xs">Speichern</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('toggle_employee', employee_id=emp.id) }}">
+                        {% if emp.active %}
+                            <button type="submit" class="btn btn-outline btn-error btn-xs">Deaktivieren</button>
+                        {% else %}
+                            <button type="submit" class="btn btn-outline btn-success btn-xs">Aktivieren</button>
+                        {% endif %}
+                    </form>
+                        </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+                <p class="text-base-content/60 text-sm">Noch keine Mitarbeiter angelegt.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Kunden -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h3 class="card-title">Kunden</h3>
+
+            <form method="POST" action="{{ url_for('add_customer') }}" class="flex gap-2 mt-2">
+                <input type="text" name="name" class="input input-bordered input-sm flex-1" placeholder="Neuer Kunde..." required>
+                <button type="submit" class="btn btn-sm btn-primary">+</button>
+            </form>
+
+            <div class="divider my-2"></div>
+
+            {% if customers %}
+            <div class="space-y-3">
+                {% for cust in customers %}
+                <div class="{{ 'opacity-40' if not cust.active }} border-b border-base-200 pb-3 last:border-0">
+                    <form method="POST" action="{{ url_for('edit_customer', customer_id=cust.id) }}">
+                        <input type="hidden" name="active" value="{{ '1' if cust.active else '0' }}">
+                        <input type="text" name="name" class="input input-bordered input-sm w-full mb-2" value="{{ cust.name }}" required>
+                        <div class="flex justify-end gap-2">
+                            <button type="submit" class="btn btn-ghost btn-xs">Speichern</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('toggle_customer', customer_id=cust.id) }}">
+                        {% if cust.active %}
+                            <button type="submit" class="btn btn-outline btn-error btn-xs">Deaktivieren</button>
+                        {% else %}
+                            <button type="submit" class="btn btn-outline btn-success btn-xs">Aktivieren</button>
+                        {% endif %}
+                    </form>
+                        </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+                <p class="text-base-content/60 text-sm">Noch keine Kunden angelegt.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Leistungen -->
+    <div class="card bg-base-100 shadow-md">
+        <div class="card-body">
+            <h3 class="card-title">Leistungen</h3>
+
+            <form method="POST" action="{{ url_for('add_service') }}" class="space-y-2 mt-2">
+                <input type="text" name="name" class="input input-bordered input-sm w-full" placeholder="Neue Leistung..." required>
+                <div class="flex gap-2">
+                    <input type="number" name="price_per_hour" class="input input-bordered input-sm flex-1" step="0.01" min="0" placeholder="CHF/h" required>
+                    <button type="submit" class="btn btn-sm btn-primary">+</button>
+                </div>
+            </form>
+
+            <div class="divider my-2"></div>
+
+            {% if services %}
+            <div class="space-y-3">
+                {% for svc in services %}
+                <div class="{{ 'opacity-40' if not svc.active }} border-b border-base-200 pb-3 last:border-0">
+                    <form method="POST" action="{{ url_for('edit_service', service_id=svc.id) }}">
+                        <input type="hidden" name="active" value="{{ '1' if svc.active else '0' }}">
+                        <input type="text" name="name" class="input input-bordered input-sm w-full mb-1" value="{{ svc.name }}" required>
+                        <div class="flex items-center gap-2 mb-2">
+                            <input type="number" name="price_per_hour" class="input input-bordered input-sm flex-1" step="0.01" min="0" value="{{ svc.price_per_hour }}" required>
+                            <span class="text-sm text-base-content/60 shrink-0">CHF/h</span>
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="submit" class="btn btn-ghost btn-xs">Speichern</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('toggle_service', service_id=svc.id) }}">
+                        {% if svc.active %}
+                            <button type="submit" class="btn btn-outline btn-error btn-xs">Deaktivieren</button>
+                        {% else %}
+                            <button type="submit" class="btn btn-outline btn-success btn-xs">Aktivieren</button>
+                        {% endif %}
+                    </form>
+                        </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+                <p class="text-base-content/60 text-sm">Noch keine Leistungen angelegt.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Übersicht - Montalux Timetracker{% endblock %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-md mb-6">
+    <div class="card-body">
+        <h2 class="card-title text-2xl mb-4">Buchungsübersicht</h2>
+
+        <!-- Filter -->
+        <form method="GET" action="{{ url_for('entries') }}" class="mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-sm">Mitarbeiter</span></label>
+                    <select name="employee_id" class="select select-bordered select-sm w-full">
+                        <option value="">Alle</option>
+                        {% for emp in employees %}
+                            <option value="{{ emp.id }}" {{ 'selected' if filters.employee_id == emp.id }}>{{ emp.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-sm">Kunde</span></label>
+                    <select name="customer_id" class="select select-bordered select-sm w-full">
+                        <option value="">Alle</option>
+                        {% for cust in customers %}
+                            <option value="{{ cust.id }}" {{ 'selected' if filters.customer_id == cust.id }}>{{ cust.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-sm">Von</span></label>
+                    <input type="date" name="date_from" class="input input-bordered input-sm w-full" value="{{ filters.date_from }}">
+                </div>
+
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-sm">Bis</span></label>
+                    <input type="date" name="date_to" class="input input-bordered input-sm w-full" value="{{ filters.date_to }}">
+                </div>
+
+                <div class="form-control">
+                    <label class="label"><span class="label-text text-sm">Typ</span></label>
+                    <select name="type" class="select select-bordered select-sm w-full">
+                        <option value="">Alle</option>
+                        <option value="time" {{ 'selected' if filters.type == 'time' }}>Zeit</option>
+                        <option value="material" {{ 'selected' if filters.type == 'material' }}>Material</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-2 mt-3">
+                <button type="submit" class="btn btn-sm btn-primary">Filtern</button>
+                <a href="{{ url_for('entries') }}" class="btn btn-sm btn-ghost">Zurücksetzen</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabelle -->
+<div class="card bg-base-100 shadow-md">
+    <div class="card-body p-0">
+        {% if entries %}
+        <div class="overflow-x-auto">
+            <table class="table table-zebra">
+                <thead>
+                    <tr>
+                        <th>Datum</th>
+                        <th>Typ</th>
+                        <th>Mitarbeiter</th>
+                        <th>Kunde</th>
+                        <th>Leistung / Material</th>
+                        <th class="text-right">Dauer / Menge</th>
+                        <th class="text-right">Betrag</th>
+                        <th>Notiz</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    <tr>
+                        <td class="whitespace-nowrap">{{ entry.date }}</td>
+                        <td>
+                            {% if entry.type == 'time' %}
+                                <span class="badge badge-primary badge-sm">Zeit</span>
+                            {% else %}
+                                <span class="badge badge-secondary badge-sm">Material</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ entry.employee }}</td>
+                        <td>{{ entry.customer }}</td>
+                        <td>
+                            {% if entry.type == 'time' %}
+                                {{ entry.service }}
+                            {% else %}
+                                {{ entry.description }}
+                            {% endif %}
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            {% if entry.type == 'time' %}
+                                {% if entry.duration_minutes >= 60 %}
+                                    {{ entry.duration_minutes // 60 }}h {{ entry.duration_minutes % 60 }}min
+                                {% else %}
+                                    {{ entry.duration_minutes }} min
+                                {% endif %}
+                            {% else %}
+                                {% if entry.quantity %}{{ entry.quantity }}{% endif %}
+                            {% endif %}
+                        </td>
+                        <td class="text-right whitespace-nowrap">
+                            {% if entry.amount %}{{ "%.2f"|format(entry.amount) }} CHF{% endif %}
+                        </td>
+                        <td class="max-w-xs truncate">{{ entry.note or '' }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('delete_time' if entry.type == 'time' else 'delete_material', entry_id=entry.id) }}"
+                                  onsubmit="return confirm('Buchung wirklich löschen?')">
+                                <button type="submit" class="btn btn-ghost btn-xs text-error">X</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="font-bold">
+                        <td colspan="5">Total</td>
+                        <td class="text-right">
+                            {% set hours = total_minutes // 60 %}
+                            {% set mins = total_minutes % 60 %}
+                            {% if hours %}{{ hours }}h {% endif %}{{ mins }}min
+                        </td>
+                        <td class="text-right">{{ "%.2f"|format(total_amount) }} CHF</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+            <div class="p-8 text-center text-base-content/60">
+                Keine Buchungen gefunden.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Export -->
+{% if entries %}
+<div class="flex justify-end mt-4">
+    <a href="{{ url_for('export_csv', employee_id=filters.employee_id or '', customer_id=filters.customer_id or '', date_from=filters.date_from, date_to=filters.date_to, type=filters.type) }}"
+       class="btn btn-sm btn-outline">
+        CSV exportieren
+    </a>
+</div>
+{% endif %}
+{% endblock %}
