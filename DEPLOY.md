@@ -1,116 +1,133 @@
-# Deployment auf PythonAnywhere
+# Deployment — Montalux Timetracker (Vite + Supabase)
 
-## Voraussetzungen
+## Architektur
 
-- Gratis-Account auf [pythonanywhere.com](https://www.pythonanywhere.com)
-- Code auf GitHub (privates Repo mit Personal Access Token)
-
----
-
-## Ersteinrichtung
-
-### 1. Code auf PythonAnywhere klonen
-
-Bash-Console öffnen (Consoles → Bash):
-
-```bash
-git clone https://ghp_DEIN_TOKEN@github.com/Montalux/montalux-timetracker.git timetracker
-cd timetracker
-pip install --user -r requirements.txt
-```
-
-### 2. Web-App erstellen
-
-- **Web** Tab → **Add a new web app**
-- Wähle: **Manual configuration** (nicht "Flask"!)
-- Wähle: **Python 3.13** (oder neueste Version)
-
-### 3. WSGI konfigurieren
-
-Auf der Web-Seite, klicke auf den Link bei **WSGI configuration file**. Gesamten Inhalt ersetzen mit:
-
-```python
-import sys
-import os
-
-project_path = '/home/Montalux/timetracker'
-if project_path not in sys.path:
-    sys.path.insert(0, project_path)
-
-os.chdir(project_path)
-os.environ['SECRET_KEY'] = 'mntlx-tt-2026-xK9vPqR3wZ7jN5mB'
-os.environ['APP_PASSWORD'] = 'euer-team-passwort'
-
-from wsgi import application
-```
-
-> `SECRET_KEY` — beliebiger langer String (Session-Verschlüsselung)
-> `APP_PASSWORD` — das Passwort das euer Team zum Anmelden braucht
-
-### 4. Static Files
-
-Auf der **Web**-Seite unter **Static files**:
-
-| URL | Directory |
-|-----|-----------|
-| `/static/` | `/home/Montalux/timetracker/static` |
-
-### 5. Reload
-
-Grünen **Reload**-Button klicken. App läuft unter `https://Montalux.pythonanywhere.com`.
+- **Frontend:** Vite + React + TypeScript → baut zu statischen Dateien (`dist/`)
+- **Backend:** Supabase (Postgres-Datenbank + Auth + REST API)
+- **Hosting:** Beliebig — jeder Hoster der HTML/JS/CSS servieren kann
 
 ---
 
-## Tägliches Backup einrichten
+## 1. Supabase einrichten
 
-- Gehe zu **Tasks** Tab
-- Erstelle einen **Daily scheduled task**:
-  - Time: `02:00`
-  - Command: `cd /home/Montalux/timetracker && python backup.py`
+### 1.1 Projekt erstellen
 
-Backups landen in `~/timetracker/backups/` (max. 15, ältere werden automatisch gelöscht).
+1. Geh auf [app.supabase.com](https://app.supabase.com)
+2. Klick **"New Project"**
+3. Füll aus:
+   - **Name:** `montalux-timetracker`
+   - **Database Password:** Starkes Passwort wählen
+   - **Region:** `Central EU (Frankfurt)`
+4. Klick **"Create new project"** — warte ~2 Min
 
-### Backup manuell testen
+### 1.2 Datenbank-Schema erstellen
 
-```bash
-cd ~/timetracker && python backup.py
-```
+1. Im linken Menü: **"SQL Editor"** (das `>_` Symbol)
+2. Klick **"New query"**
+3. Kopiere den gesamten Inhalt von `supabase/migrations/001_initial_schema.sql` rein
+4. Klick **"Run"** (oder Ctrl+Enter)
+5. Ergebnis: **"Success. No rows returned"** ✅
+
+Das erstellt 5 Tabellen (employees, customers, services, time_entries, material_entries), Indexes und Row Level Security Policies.
+
+### 1.3 Team-User anlegen
+
+1. Im linken Menü: **"Authentication"**
+2. Klick **"Add user"** → **"Create new user"**
+3. Ausfüllen:
+   - **Email:** `team@montalux.ch`
+   - **Password:** Das Team-Passwort (damit loggen sich alle ein)
+   - ✅ **"Auto Confirm User"** aktivieren!
+4. Klick **"Create user"**
+
+### 1.4 API-Keys holen
+
+1. Im linken Menü: **"Project Settings"** (Zahnrad unten)
+2. Dann **"API"** (unter Configuration)
+3. Notiere dir:
+   - **Project URL** — z.B. `https://xyzabc123.supabase.co`
+   - **anon public** Key — langer String unter "Project API keys"
 
 ---
 
-## Updates deployen
+## 2. Lokale Entwicklung
 
-### 1. Lokal committen und pushen
+### 2.1 `.env.local` erstellen
+
+Im Projekt-Ordner:
 
 ```bash
-git add -A && git commit -m "Beschreibung" && git push
+echo 'VITE_SUPABASE_URL=https://DEINE-URL.supabase.co
+VITE_SUPABASE_ANON_KEY=DEIN-ANON-KEY' > .env.local
 ```
 
-### 2. Auf PythonAnywhere pullen
+### 2.2 Dev-Server starten
 
-Bash-Console:
 ```bash
-cd ~/timetracker && git pull
+npm install
+npm run dev
 ```
 
-### 3. Reload
-
-Web-Tab → grüner **Reload**-Button.
-
-Bei Änderungen an `requirements.txt` zusätzlich:
-```bash
-cd ~/timetracker && pip install --user -r requirements.txt
-```
+Browser öffnen → `http://localhost:5173` → Login mit Team-Passwort.
 
 ---
 
-## Passwort ändern
+## 3. Build & Deploy
 
-1. WSGI-Datei öffnen (Web-Tab → WSGI configuration file)
-2. `APP_PASSWORD` Wert ändern
-3. Reload klicken
+### 3.1 Für Produktion bauen
 
-Alle bestehenden Sessions bleiben aktiv. Neues Passwort gilt erst beim nächsten Login.
+```bash
+npm run build
+```
+
+Das erstellt den `dist/` Ordner mit allen statischen Dateien.
+
+### 3.2 Auf beliebigem Hoster deployen
+
+Den Inhalt von `dist/` hochladen (FTP, SSH, Git, etc.). Fertig.
+
+**Wichtig für SPA-Routing:** Der Webserver muss alle Routen auf `index.html` umleiten. Je nach Hoster:
+
+| Hoster / Server | Konfiguration |
+|-----------------|---------------|
+| Apache (.htaccess) | Siehe `dist/.htaccess` oder: `RewriteEngine On` / `RewriteCond %{REQUEST_FILENAME} !-f` / `RewriteRule ^ index.html [L]` |
+| Nginx | `try_files $uri $uri/ /index.html;` |
+| Netlify | `_redirects` Datei: `/* /index.html 200` |
+| Vercel | Automatisch |
+
+---
+
+## 4. Passwort ändern
+
+1. Supabase Dashboard → **Authentication** → Users
+2. User `team@montalux.ch` auswählen
+3. Passwort ändern
+
+Alle aktiven Sessions bleiben bestehen. Neues Passwort gilt beim nächsten Login.
+
+---
+
+## 5. Backups
+
+Supabase übernimmt Backups automatisch:
+
+| Tier | Backup-Intervall | Aufbewahrung |
+|------|-------------------|--------------|
+| Free | Täglich | 7 Tage |
+| Pro  | Point-in-Time Recovery | 30 Tage |
+
+Zusätzlich kann jederzeit manuell ein CSV-Export über die Buchungsübersicht gemacht werden.
+
+---
+
+## 6. Updates deployen
+
+```bash
+# Lokal
+git pull                  # falls nötig
+npm run build             # neu bauen
+# dist/ Inhalt auf den Hoster hochladen
+```
 
 ---
 
@@ -118,17 +135,8 @@ Alle bestehenden Sessions bleiben aktiv. Neues Passwort gilt erst beim nächsten
 
 | Problem | Lösung |
 |---------|--------|
-| App zeigt Error | Web-Tab → **Log files** → **Error log** prüfen |
-| Import-Fehler | Bash: `cd ~/timetracker && python -c "from wsgi import application"` |
-| Datenbank zurücksetzen | Bash: `cd ~/timetracker && rm timetracker.db && python -c "import database; database.init_db()"` |
-| Backup testen | Bash: `cd ~/timetracker && python backup.py` |
-| Abhängigkeiten fehlen | Bash: `cd ~/timetracker && pip install --user -r requirements.txt` |
-
----
-
-## Einschränkungen (Free Tier)
-
-- URL ist `Montalux.pythonanywhere.com` (keine eigene Domain)
-- App wird nach 3 Monaten Inaktivität pausiert (1 Klick zum Reaktivieren)
-- 512 MB Speicher
-- Nur 1 Web-App gleichzeitig
+| Login funktioniert nicht | Prüfe ob User in Supabase Auth existiert und "Auto Confirm" aktiv war |
+| Keine Daten sichtbar | SQL-Schema nochmals im SQL Editor ausführen |
+| Build schlägt fehl | `npm install` nochmals ausführen |
+| Seiten-Refresh zeigt 404 | SPA-Routing auf dem Webserver konfigurieren (siehe Abschnitt 3.2) |
+| `.env.local` Werte falsch | Project URL und anon Key im Supabase Dashboard unter Settings → API prüfen |
