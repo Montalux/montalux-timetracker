@@ -3,124 +3,132 @@
 ## Voraussetzungen
 
 - Gratis-Account auf [pythonanywhere.com](https://www.pythonanywhere.com)
-- Code auf GitHub (öffentliches oder privates Repo)
+- Code auf GitHub (privates Repo mit Personal Access Token)
 
 ---
 
-## Schritt 1: Code auf GitHub pushen
+## Ersteinrichtung
 
-Falls noch nicht geschehen, auf deinem Mac:
+### 1. Code auf PythonAnywhere klonen
 
-```bash
-cd /pfad/zu/Timetracker
-git init
-git add -A
-git commit -m "Initial commit"
-```
-
-Dann auf GitHub ein neues Repo erstellen (z.B. `timetracker`) und:
+Bash-Console öffnen (Consoles → Bash):
 
 ```bash
-git remote add origin https://github.com/DEIN-USER/timetracker.git
-git push -u origin main
-```
-
----
-
-## Schritt 2: PythonAnywhere einrichten
-
-### 2.1 Account erstellen
-- Gehe zu [pythonanywhere.com](https://www.pythonanywhere.com)
-- Erstelle einen **Beginner**-Account (gratis)
-- Dein Username wird Teil der URL: `deinname.pythonanywhere.com`
-
-### 2.2 Code klonen
-- Klicke oben auf **"Consoles"** → **"Bash"** (neue Bash-Console öffnen)
-- In der Console:
-
-```bash
-git clone https://github.com/DEIN-USER/timetracker.git
+git clone https://ghp_DEIN_TOKEN@github.com/Montalux/montalux-timetracker.git timetracker
 cd timetracker
 pip install --user -r requirements.txt
 ```
 
-### 2.3 Web-App erstellen
-- Gehe zu **"Web"** Tab → **"Add a new web app"**
-- Wähle: **Manual configuration** (nicht Flask!)
-- Wähle: **Python 3.10** (oder neueste verfügbare Version)
+### 2. Web-App erstellen
 
-### 2.4 WSGI konfigurieren
-- Auf der Web-Seite, klicke auf den Link bei **"WSGI configuration file"**
-  (sieht aus wie `/var/www/deinname_pythonanywhere_com_wsgi.py`)
-- **Lösche den gesamten Inhalt** und ersetze mit:
+- **Web** Tab → **Add a new web app**
+- Wähle: **Manual configuration** (nicht "Flask"!)
+- Wähle: **Python 3.13** (oder neueste Version)
+
+### 3. WSGI konfigurieren
+
+Auf der Web-Seite, klicke auf den Link bei **WSGI configuration file**. Gesamten Inhalt ersetzen mit:
 
 ```python
 import sys
 import os
 
-# Pfad zu deinem Projekt
-project_path = '/home/DEIN-USER/timetracker'
+project_path = '/home/Montalux/timetracker'
 if project_path not in sys.path:
     sys.path.insert(0, project_path)
 
 os.chdir(project_path)
-os.environ['SECRET_KEY'] = 'hier-einen-langen-zufaelligen-string-eingeben'
+os.environ['SECRET_KEY'] = 'mntlx-tt-2026-xK9vPqR3wZ7jN5mB'
+os.environ['APP_PASSWORD'] = 'euer-team-passwort'
 
 from wsgi import application
 ```
 
-> Ersetze `DEIN-USER` mit deinem PythonAnywhere-Username.
-> Ersetze den SECRET_KEY mit einem langen, zufälligen String.
+> `SECRET_KEY` — beliebiger langer String (Session-Verschlüsselung)
+> `APP_PASSWORD` — das Passwort das euer Team zum Anmelden braucht
 
-### 2.5 Static Files konfigurieren
-- Auf der **Web**-Seite, unter **"Static files"**:
-  - URL: `/static/`
-  - Directory: `/home/DEIN-USER/timetracker/static`
+### 4. Static Files
 
-### 2.6 App starten
-- Klicke den grünen **"Reload"**-Button oben auf der Web-Seite
-- Öffne `https://deinname.pythonanywhere.com` im Browser
+Auf der **Web**-Seite unter **Static files**:
+
+| URL | Directory |
+|-----|-----------|
+| `/static/` | `/home/Montalux/timetracker/static` |
+
+### 5. Reload
+
+Grünen **Reload**-Button klicken. App läuft unter `https://Montalux.pythonanywhere.com`.
 
 ---
 
-## Schritt 3: Tägliches Backup einrichten
+## Tägliches Backup einrichten
 
-- Gehe zu **"Tasks"** Tab
+- Gehe zu **Tasks** Tab
 - Erstelle einen **Daily scheduled task**:
-  - Time: `02:00` (oder wann ihr wollt)
-  - Command: `cd /home/DEIN-USER/timetracker && python backup.py`
+  - Time: `02:00`
+  - Command: `cd /home/Montalux/timetracker && python backup.py`
+
+Backups landen in `~/timetracker/backups/` (max. 15, ältere werden automatisch gelöscht).
+
+### Backup manuell testen
+
+```bash
+cd ~/timetracker && python backup.py
+```
 
 ---
 
 ## Updates deployen
 
-Wenn du Änderungen am Code machst:
+### 1. Lokal committen und pushen
 
-1. Lokal committen und pushen:
-   ```bash
-   git add -A && git commit -m "Änderung" && git push
-   ```
+```bash
+git add -A && git commit -m "Beschreibung" && git push
+```
 
-2. Auf PythonAnywhere in der Bash-Console:
-   ```bash
-   cd ~/timetracker && git pull
-   ```
+### 2. Auf PythonAnywhere pullen
 
-3. Auf der **Web**-Seite → **"Reload"** klicken
+Bash-Console:
+```bash
+cd ~/timetracker && git pull
+```
+
+### 3. Reload
+
+Web-Tab → grüner **Reload**-Button.
+
+Bei Änderungen an `requirements.txt` zusätzlich:
+```bash
+cd ~/timetracker && pip install --user -r requirements.txt
+```
+
+---
+
+## Passwort ändern
+
+1. WSGI-Datei öffnen (Web-Tab → WSGI configuration file)
+2. `APP_PASSWORD` Wert ändern
+3. Reload klicken
+
+Alle bestehenden Sessions bleiben aktiv. Neues Passwort gilt erst beim nächsten Login.
 
 ---
 
 ## Fehlerbehebung
 
-- **Error-Log:** Web-Seite → "Log files" → "Error log" anklicken
-- **Console testen:** In Bash-Console `cd timetracker && python -c "import app; print('OK')"`
-- **Datenbank zurücksetzen:** `cd timetracker && rm timetracker.db && python -c "import database; database.init_db()"`
+| Problem | Lösung |
+|---------|--------|
+| App zeigt Error | Web-Tab → **Log files** → **Error log** prüfen |
+| Import-Fehler | Bash: `cd ~/timetracker && python -c "from wsgi import application"` |
+| Datenbank zurücksetzen | Bash: `cd ~/timetracker && rm timetracker.db && python -c "import database; database.init_db()"` |
+| Backup testen | Bash: `cd ~/timetracker && python backup.py` |
+| Abhängigkeiten fehlen | Bash: `cd ~/timetracker && pip install --user -r requirements.txt` |
 
 ---
 
 ## Einschränkungen (Free Tier)
 
-- URL ist `deinname.pythonanywhere.com` (keine eigene Domain)
+- URL ist `Montalux.pythonanywhere.com` (keine eigene Domain)
 - App wird nach 3 Monaten Inaktivität pausiert (1 Klick zum Reaktivieren)
 - 512 MB Speicher
 - Nur 1 Web-App gleichzeitig
