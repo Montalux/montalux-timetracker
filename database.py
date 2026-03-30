@@ -1,8 +1,10 @@
+import logging
 import os
-import shutil
 import sqlite3
 import threading
 from datetime import datetime, date
+
+from flask import g
 
 DB_PATH = "timetracker.db"
 BACKUP_DIR = "backups"
@@ -13,6 +15,30 @@ _backup_timer = None
 
 
 def get_db():
+    """Get database connection from Flask g or create a new one."""
+    try:
+        if 'db' not in g:
+            g.db = sqlite3.connect(DB_PATH)
+            g.db.row_factory = sqlite3.Row
+            g.db.execute("PRAGMA foreign_keys = ON")
+        return g.db
+    except RuntimeError:
+        # Outside Flask request context (init, backup, tests)
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
+
+def close_db(e=None):
+    """Close database connection stored in Flask g."""
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+
+
+def _get_standalone_conn():
+    """Get a standalone connection outside Flask context."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -20,14 +46,19 @@ def get_db():
 
 
 def _run_backup():
-    """Erstellt eine Kopie der DB-Datei mit Zeitstempel."""
+    """Erstellt ein sicheres Backup via SQLite Backup API."""
     global _backup_timer
     try:
         if os.path.exists(DB_PATH):
             os.makedirs(BACKUP_DIR, exist_ok=True)
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            dest = os.path.join(BACKUP_DIR, f"timetracker_{timestamp}.db")
-            shutil.copy2(DB_PATH, dest)
+            dest_path = os.path.join(BACKUP_DIR, f"timetracker_{timestamp}.db")
+
+            source = sqlite3.connect(DB_PATH)
+            dest = sqlite3.connect(dest_path)
+            source.backup(dest)
+            dest.close()
+            source.close()
 
             # Alte Backups aufräumen
             backups = sorted(
@@ -36,8 +67,8 @@ def _run_backup():
             )
             for old in backups[BACKUP_MAX:]:
                 os.remove(os.path.join(BACKUP_DIR, old))
-    except Exception:
-        pass  # Backup-Fehler sollen die App nicht stoppen
+    except Exception as e:
+        logging.error(f"Backup fehlgeschlagen: {e}")
 
     # Nächsten Timer starten
     _backup_timer = threading.Timer(BACKUP_INTERVAL, _run_backup)
@@ -53,7 +84,7 @@ def start_backup_scheduler():
 
 
 def init_db():
-    conn = get_db()
+    conn = _get_standalone_conn()
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS employees (
@@ -97,6 +128,13 @@ def init_db():
             note TEXT,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE INDEX IF NOT EXISTS idx_time_entries_date ON time_entries(date);
+        CREATE INDEX IF NOT EXISTS idx_time_entries_employee ON time_entries(employee_id);
+        CREATE INDEX IF NOT EXISTS idx_time_entries_customer ON time_entries(customer_id);
+        CREATE INDEX IF NOT EXISTS idx_material_entries_date ON material_entries(date);
+        CREATE INDEX IF NOT EXISTS idx_material_entries_employee ON material_entries(employee_id);
+        CREATE INDEX IF NOT EXISTS idx_material_entries_customer ON material_entries(customer_id);
     """)
     conn.close()
 
@@ -109,36 +147,30 @@ def get_employees(active_only=True):
         rows = conn.execute("SELECT * FROM employees WHERE active = 1 ORDER BY name").fetchall()
     else:
         rows = conn.execute("SELECT * FROM employees ORDER BY name").fetchall()
-    conn.close()
     return rows
 
 
 def get_employee(employee_id):
     conn = get_db()
-    row = conn.execute("SELECT * FROM employees WHERE id = ?", (employee_id,)).fetchone()
-    conn.close()
-    return row
+    return conn.execute("SELECT * FROM employees WHERE id = ?", (employee_id,)).fetchone()
 
 
 def add_employee(name):
     conn = get_db()
     conn.execute("INSERT INTO employees (name) VALUES (?)", (name,))
     conn.commit()
-    conn.close()
 
 
 def update_employee(employee_id, name, active):
     conn = get_db()
     conn.execute("UPDATE employees SET name = ?, active = ? WHERE id = ?", (name, active, employee_id))
     conn.commit()
-    conn.close()
 
 
 def toggle_employee(employee_id):
     conn = get_db()
     conn.execute("UPDATE employees SET active = NOT active WHERE id = ?", (employee_id,))
     conn.commit()
-    conn.close()
 
 
 # --- Customers ---
@@ -149,36 +181,30 @@ def get_customers(active_only=True):
         rows = conn.execute("SELECT * FROM customers WHERE active = 1 ORDER BY name").fetchall()
     else:
         rows = conn.execute("SELECT * FROM customers ORDER BY name").fetchall()
-    conn.close()
     return rows
 
 
 def get_customer(customer_id):
     conn = get_db()
-    row = conn.execute("SELECT * FROM customers WHERE id = ?", (customer_id,)).fetchone()
-    conn.close()
-    return row
+    return conn.execute("SELECT * FROM customers WHERE id = ?", (customer_id,)).fetchone()
 
 
 def add_customer(name):
     conn = get_db()
     conn.execute("INSERT INTO customers (name) VALUES (?)", (name,))
     conn.commit()
-    conn.close()
 
 
 def update_customer(customer_id, name, active):
     conn = get_db()
     conn.execute("UPDATE customers SET name = ?, active = ? WHERE id = ?", (name, active, customer_id))
     conn.commit()
-    conn.close()
 
 
 def toggle_customer(customer_id):
     conn = get_db()
     conn.execute("UPDATE customers SET active = NOT active WHERE id = ?", (customer_id,))
     conn.commit()
-    conn.close()
 
 
 # --- Services ---
@@ -189,22 +215,18 @@ def get_services(active_only=True):
         rows = conn.execute("SELECT * FROM services WHERE active = 1 ORDER BY name").fetchall()
     else:
         rows = conn.execute("SELECT * FROM services ORDER BY name").fetchall()
-    conn.close()
     return rows
 
 
 def get_service(service_id):
     conn = get_db()
-    row = conn.execute("SELECT * FROM services WHERE id = ?", (service_id,)).fetchone()
-    conn.close()
-    return row
+    return conn.execute("SELECT * FROM services WHERE id = ?", (service_id,)).fetchone()
 
 
 def add_service(name, price_per_hour):
     conn = get_db()
     conn.execute("INSERT INTO services (name, price_per_hour) VALUES (?, ?)", (name, price_per_hour))
     conn.commit()
-    conn.close()
 
 
 def update_service(service_id, name, price_per_hour, active):
@@ -212,14 +234,12 @@ def update_service(service_id, name, price_per_hour, active):
     conn.execute("UPDATE services SET name = ?, price_per_hour = ?, active = ? WHERE id = ?",
                  (name, price_per_hour, active, service_id))
     conn.commit()
-    conn.close()
 
 
 def toggle_service(service_id):
     conn = get_db()
     conn.execute("UPDATE services SET active = NOT active WHERE id = ?", (service_id,))
     conn.commit()
-    conn.close()
 
 
 # --- Time Entries ---
@@ -232,14 +252,12 @@ def add_time_entry(employee_id, customer_id, service_id, entry_date, duration_mi
         (employee_id, customer_id, service_id, entry_date, duration_minutes, note)
     )
     conn.commit()
-    conn.close()
 
 
 def delete_time_entry(entry_id):
     conn = get_db()
     conn.execute("DELETE FROM time_entries WHERE id = ?", (entry_id,))
     conn.commit()
-    conn.close()
 
 
 # --- Material Entries ---
@@ -252,24 +270,22 @@ def add_material_entry(employee_id, customer_id, entry_date, description, quanti
         (employee_id, customer_id, entry_date, description, quantity, amount, note)
     )
     conn.commit()
-    conn.close()
 
 
 def delete_material_entry(entry_id):
     conn = get_db()
     conn.execute("DELETE FROM material_entries WHERE id = ?", (entry_id,))
     conn.commit()
-    conn.close()
 
 
 # --- Combined Queries ---
 
 def get_entries(employee_id=None, customer_id=None, date_from=None, date_to=None, entry_type=None):
     """Get combined time and material entries with filters."""
+    conn = get_db()
     results = []
 
     if entry_type != "material":
-        # Time entries
         sql = """
             SELECT t.id, 'time' as type, t.date, e.name as employee, c.name as customer,
                    s.name as service, t.duration_minutes, s.price_per_hour,
@@ -295,13 +311,10 @@ def get_entries(employee_id=None, customer_id=None, date_from=None, date_to=None
             sql += " AND t.date <= ?"
             params.append(date_to)
 
-        conn = get_db()
         rows = conn.execute(sql, params).fetchall()
         results.extend([dict(r) for r in rows])
-        conn.close()
 
     if entry_type != "time":
-        # Material entries
         sql = """
             SELECT m.id, 'material' as type, m.date, e.name as employee, c.name as customer,
                    NULL as service, NULL as duration_minutes, NULL as price_per_hour,
@@ -325,10 +338,8 @@ def get_entries(employee_id=None, customer_id=None, date_from=None, date_to=None
             sql += " AND m.date <= ?"
             params.append(date_to)
 
-        conn = get_db()
         rows = conn.execute(sql, params).fetchall()
         results.extend([dict(r) for r in rows])
-        conn.close()
 
     results.sort(key=lambda x: x["date"], reverse=True)
     return results

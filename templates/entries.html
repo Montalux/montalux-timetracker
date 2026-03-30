@@ -113,6 +113,7 @@
                         <td>
                             <form method="POST" action="{{ url_for('delete_time' if entry.type == 'time' else 'delete_material', entry_id=entry.id) }}"
                                   onsubmit="return confirm('Buchung wirklich löschen?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-ghost btn-xs text-error">X</button>
                             </form>
                         </td>

@@ -19,6 +19,7 @@
 
         <!-- Zeit-Formular -->
         <form id="form-time" method="POST" action="{{ url_for('index') }}" onsubmit="return validateDurationWithTimer()">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="entry_type" value="time">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-control w-full">
@@ -123,6 +124,7 @@
 
         <!-- Material-Formular -->
         <form id="form-material" method="POST" action="{{ url_for('index') }}" class="hidden">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="entry_type" value="material">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-control w-full">

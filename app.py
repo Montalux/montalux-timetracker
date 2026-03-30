@@ -1,18 +1,20 @@
 import csv
 import io
+import os
+import logging
 from datetime import date, datetime
 
 from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from flask_wtf.csrf import CSRFProtect
 
 import database as db
 
 app = Flask(__name__)
-app.secret_key = "timetracker-local-dev-key"
-
-
-@app.before_request
-def ensure_db():
-    db.init_db()
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-fallback-key")
+if not os.environ.get("SECRET_KEY"):
+    logging.warning("SECRET_KEY not set — using insecure fallback. Set SECRET_KEY env var for production.")
+csrf = CSRFProtect(app)
+app.teardown_appcontext(db.close_db)
 
 
 # --- Buchung ---
@@ -33,10 +35,13 @@ def index():
             if not all([employee_id, customer_id, service_id, duration, entry_date]):
                 flash("Bitte alle Pflichtfelder ausfüllen.", "error")
             else:
-                db.add_time_entry(int(employee_id), int(customer_id), int(service_id),
-                                  entry_date, int(duration), note)
-                flash("Zeitbuchung erfolgreich gespeichert.", "success")
-                return redirect(url_for("index"))
+                try:
+                    db.add_time_entry(int(employee_id), int(customer_id), int(service_id),
+                                      entry_date, int(duration), note)
+                    flash("Zeitbuchung erfolgreich gespeichert.", "success")
+                    return redirect(url_for("index"))
+                except (ValueError, TypeError):
+                    flash("Ungültige Eingabe bei numerischen Feldern.", "error")
 
         elif entry_type == "material":
             employee_id = request.form.get("employee_id")
@@ -50,12 +55,15 @@ def index():
             if not all([employee_id, customer_id, description, entry_date]):
                 flash("Bitte alle Pflichtfelder ausfüllen.", "error")
             else:
-                qty = float(quantity) if quantity else 0
-                amt = float(amount) if amount else 0
-                db.add_material_entry(int(employee_id), int(customer_id), entry_date,
-                                      description, qty, amt, note)
-                flash("Materialbuchung erfolgreich gespeichert.", "success")
-                return redirect(url_for("index"))
+                try:
+                    qty = float(quantity) if quantity else 0
+                    amt = float(amount) if amount else 0
+                    db.add_material_entry(int(employee_id), int(customer_id), entry_date,
+                                          description, qty, amt, note)
+                    flash("Materialbuchung erfolgreich gespeichert.", "success")
+                    return redirect(url_for("index"))
+                except (ValueError, TypeError):
+                    flash("Ungültige Eingabe bei numerischen Feldern.", "error")
 
     employees = db.get_employees()
     customers = db.get_customers()
@@ -211,8 +219,11 @@ def add_service():
     name = request.form.get("name", "").strip()
     price = request.form.get("price_per_hour")
     if name and price:
-        db.add_service(name, float(price))
-        flash(f"Leistung '{name}' hinzugefügt.", "success")
+        try:
+            db.add_service(name, float(price))
+            flash(f"Leistung '{name}' hinzugefügt.", "success")
+        except (ValueError, TypeError):
+            flash("Ungültiger Preis.", "error")
     else:
         flash("Name und Preis sind Pflichtfelder.", "error")
     return redirect(url_for("admin"))
@@ -224,8 +235,11 @@ def edit_service(service_id):
     price = request.form.get("price_per_hour")
     active = request.form.get("active") == "1"
     if name and price:
-        db.update_service(service_id, name, float(price), active)
-        flash("Leistung aktualisiert.", "success")
+        try:
+            db.update_service(service_id, name, float(price), active)
+            flash("Leistung aktualisiert.", "success")
+        except (ValueError, TypeError):
+            flash("Ungültiger Preis.", "error")
     return redirect(url_for("admin"))
 
 
