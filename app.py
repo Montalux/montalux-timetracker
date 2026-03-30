@@ -17,8 +17,8 @@ if not os.environ.get("SECRET_KEY"):
 csrf = CSRFProtect(app)
 app.teardown_appcontext(db.close_db)
 
-# App-Passwort (aus Umgebungsvariable oder Fallback für Entwicklung)
-APP_PASSWORD = os.environ.get("APP_PASSWORD", "montalux")
+def get_app_password():
+    return os.environ.get("APP_PASSWORD", "montalux")
 
 
 # --- Login ---
@@ -38,7 +38,7 @@ def login():
         return redirect(url_for("index"))
     if request.method == "POST":
         password = request.form.get("password", "")
-        if password == APP_PASSWORD:
+        if password == get_app_password():
             session["authenticated"] = True
             session.permanent = True
             flash("Angemeldet.", "success")
