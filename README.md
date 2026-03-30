@@ -1,6 +1,6 @@
 # Montalux Timetracker
 
-Einfache Zeiterfassungs-App für die Montalux AG. Erfasst Zeit- und Materialbuchungen pro Mitarbeiter und Kunde.
+Einfache Zeiterfassungs-App für Montalux AG. Erfasst Zeit- und Materialbuchungen pro Mitarbeiter und Kunde.
 
 ## Features
 
