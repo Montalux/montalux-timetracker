@@ -2,9 +2,10 @@ import csv
 import io
 import os
 import logging
+from functools import wraps
 from datetime import date, datetime
 
-from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, session
 from flask_wtf.csrf import CSRFProtect
 
 import database as db
@@ -16,10 +17,48 @@ if not os.environ.get("SECRET_KEY"):
 csrf = CSRFProtect(app)
 app.teardown_appcontext(db.close_db)
 
+# App-Passwort (aus Umgebungsvariable oder Fallback für Entwicklung)
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "montalux")
+
+
+# --- Login ---
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("authenticated"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("authenticated"):
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if password == APP_PASSWORD:
+            session["authenticated"] = True
+            session.permanent = True
+            flash("Angemeldet.", "success")
+            return redirect(url_for("index"))
+        else:
+            flash("Falsches Passwort.", "error")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Abgemeldet.", "success")
+    return redirect(url_for("login"))
+
 
 # --- Buchung ---
 
 @app.route("/", methods=["GET", "POST"])
+@login_required
 def index():
     if request.method == "POST":
         entry_type = request.form.get("entry_type")
@@ -76,6 +115,7 @@ def index():
 # --- Übersicht ---
 
 @app.route("/entries")
+@login_required
 def entries():
     employee_id = request.args.get("employee_id", type=int)
     customer_id = request.args.get("customer_id", type=int)
@@ -106,6 +146,7 @@ def entries():
 # --- CSV Export ---
 
 @app.route("/export/csv")
+@login_required
 def export_csv():
     employee_id = request.args.get("employee_id", type=int)
     customer_id = request.args.get("customer_id", type=int)
@@ -148,6 +189,7 @@ def export_csv():
 # --- Delete entries ---
 
 @app.route("/entries/delete/time/<int:entry_id>", methods=["POST"])
+@login_required
 def delete_time(entry_id):
     db.delete_time_entry(entry_id)
     flash("Zeitbuchung gelöscht.", "success")
@@ -155,6 +197,7 @@ def delete_time(entry_id):
 
 
 @app.route("/entries/delete/material/<int:entry_id>", methods=["POST"])
+@login_required
 def delete_material(entry_id):
     db.delete_material_entry(entry_id)
     flash("Materialbuchung gelöscht.", "success")
@@ -164,6 +207,7 @@ def delete_material(entry_id):
 # --- Verwaltung ---
 
 @app.route("/admin")
+@login_required
 def admin():
     employees = db.get_employees(active_only=False)
     customers = db.get_customers(active_only=False)
@@ -173,6 +217,7 @@ def admin():
 
 
 @app.route("/admin/employee/add", methods=["POST"])
+@login_required
 def add_employee():
     name = request.form.get("name", "").strip()
     if name:
@@ -184,6 +229,7 @@ def add_employee():
 
 
 @app.route("/admin/employee/<int:employee_id>/edit", methods=["POST"])
+@login_required
 def edit_employee(employee_id):
     name = request.form.get("name", "").strip()
     active = request.form.get("active") == "1"
@@ -194,6 +240,7 @@ def edit_employee(employee_id):
 
 
 @app.route("/admin/customer/add", methods=["POST"])
+@login_required
 def add_customer():
     name = request.form.get("name", "").strip()
     if name:
@@ -205,6 +252,7 @@ def add_customer():
 
 
 @app.route("/admin/customer/<int:customer_id>/edit", methods=["POST"])
+@login_required
 def edit_customer(customer_id):
     name = request.form.get("name", "").strip()
     active = request.form.get("active") == "1"
@@ -215,6 +263,7 @@ def edit_customer(customer_id):
 
 
 @app.route("/admin/service/add", methods=["POST"])
+@login_required
 def add_service():
     name = request.form.get("name", "").strip()
     price = request.form.get("price_per_hour")
@@ -230,6 +279,7 @@ def add_service():
 
 
 @app.route("/admin/service/<int:service_id>/edit", methods=["POST"])
+@login_required
 def edit_service(service_id):
     name = request.form.get("name", "").strip()
     price = request.form.get("price_per_hour")
@@ -244,6 +294,7 @@ def edit_service(service_id):
 
 
 @app.route("/admin/employee/<int:employee_id>/toggle", methods=["POST"])
+@login_required
 def toggle_employee(employee_id):
     db.toggle_employee(employee_id)
     flash("Mitarbeiter-Status geändert.", "success")
@@ -251,6 +302,7 @@ def toggle_employee(employee_id):
 
 
 @app.route("/admin/customer/<int:customer_id>/toggle", methods=["POST"])
+@login_required
 def toggle_customer(customer_id):
     db.toggle_customer(customer_id)
     flash("Kunden-Status geändert.", "success")
@@ -258,6 +310,7 @@ def toggle_customer(customer_id):
 
 
 @app.route("/admin/service/<int:service_id>/toggle", methods=["POST"])
+@login_required
 def toggle_service(service_id):
     db.toggle_service(service_id)
     flash("Leistungs-Status geändert.", "success")

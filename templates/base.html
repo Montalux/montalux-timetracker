@@ -21,7 +21,11 @@
                 <li><a href="{{ url_for('admin') }}" class="{% if request.endpoint == 'admin' %}active{% endif %}">Verwaltung</a></li>
             </ul>
         </div>
-        <div class="navbar-end"></div>
+        <div class="navbar-end">
+            {% if session.get('authenticated') %}
+                <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm">Abmelden</a>
+            {% endif %}
+        </div>
     </div>
 
     <main class="container mx-auto px-4 py-6 max-w-5xl">

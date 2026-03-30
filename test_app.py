@@ -3,6 +3,7 @@ import tempfile
 import pytest
 
 os.environ["SECRET_KEY"] = "test-secret-key"
+os.environ["APP_PASSWORD"] = "testpass"
 
 import app as flask_app
 import database as db
@@ -17,6 +18,9 @@ def client(tmp_path):
     flask_app.app.config["WTF_CSRF_ENABLED"] = False
     with flask_app.app.test_client() as client:
         with flask_app.app.app_context():
+            # Auto-login for all tests
+            with client.session_transaction() as sess:
+                sess["authenticated"] = True
             yield client
 
 
@@ -179,3 +183,35 @@ def test_entries_with_filters(client):
 
     resp = client.get("/entries?employee_id=1&date_from=2026-03-01&date_to=2026-03-31&type=time")
     assert resp.status_code == 200
+
+
+# --- Login ---
+
+def test_login_page_loads(client):
+    with client.session_transaction() as sess:
+        sess.clear()
+    resp = client.get("/login")
+    assert resp.status_code == 200
+    assert "Passwort" in resp.data.decode()
+
+
+def test_login_wrong_password(client):
+    with client.session_transaction() as sess:
+        sess.clear()
+    resp = client.post("/login", data={"password": "wrong"}, follow_redirects=True)
+    assert "Falsches Passwort" in resp.data.decode()
+
+
+def test_login_correct_password(client):
+    with client.session_transaction() as sess:
+        sess.clear()
+    resp = client.post("/login", data={"password": "testpass"}, follow_redirects=True)
+    assert "Angemeldet" in resp.data.decode()
+
+
+def test_unauthenticated_redirect(client):
+    with client.session_transaction() as sess:
+        sess.clear()
+    resp = client.get("/")
+    assert resp.status_code == 302
+    assert "/login" in resp.headers["Location"]

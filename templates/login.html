@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Login - Montalux Timetracker{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center min-h-[60vh]">
+    <div class="card bg-base-100 shadow-md w-full max-w-sm">
+        <div class="card-body">
+            <h2 class="card-title text-2xl mb-4 justify-center">Montalux Timetracker</h2>
+            <form method="POST" action="{{ url_for('login') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-control w-full">
+                    <label class="label"><span class="label-text">Passwort</span></label>
+                    <input type="password" name="password" class="input input-bordered w-full" placeholder="Passwort eingeben..." required autofocus>
+                </div>
+                <div class="card-actions mt-6">
+                    <button type="submit" class="btn btn-primary w-full">Anmelden</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
