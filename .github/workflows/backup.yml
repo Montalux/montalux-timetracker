@@ -1,0 +1,69 @@
+name: Daily Supabase Backup
+
+on:
+  schedule:
+    # Täglich um 02:00 UTC (03:00 Schweizer Zeit / 04:00 Sommerzeit)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Manuell auslösbar via GitHub UI
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Export all tables from Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          set -e
+          mkdir -p backup
+
+          TIMESTAMP=$(date -u +"%Y-%m-%d_%H-%M-%S")
+          TABLES=("employees" "customers" "services" "time_entries" "material_entries")
+
+          echo "Backup started at $TIMESTAMP"
+
+          for TABLE in "${TABLES[@]}"; do
+            echo "Exporting $TABLE..."
+            curl -s \
+              "${SUPABASE_URL}/rest/v1/${TABLE}?select=*" \
+              -H "apikey: ${SUPABASE_SERVICE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+              -H "Accept: application/json" \
+              -o "backup/${TABLE}.json"
+
+            # Validate JSON
+            if ! python3 -c "import json; json.load(open('backup/${TABLE}.json'))"; then
+              echo "ERROR: Invalid JSON for $TABLE"
+              cat "backup/${TABLE}.json"
+              exit 1
+            fi
+
+            COUNT=$(python3 -c "import json; print(len(json.load(open('backup/${TABLE}.json'))))")
+            echo "  -> $COUNT rows"
+          done
+
+          # Create summary
+          echo "{ \"timestamp\": \"$TIMESTAMP\", \"tables\": {" > backup/metadata.json
+          FIRST=true
+          for TABLE in "${TABLES[@]}"; do
+            COUNT=$(python3 -c "import json; print(len(json.load(open('backup/${TABLE}.json'))))")
+            if [ "$FIRST" = true ]; then
+              FIRST=false
+            else
+              echo "," >> backup/metadata.json
+            fi
+            echo "  \"$TABLE\": $COUNT" >> backup/metadata.json
+          done
+          echo "} }" >> backup/metadata.json
+
+          echo ""
+          echo "Backup complete!"
+          cat backup/metadata.json
+
+      - name: Upload backup as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ github.run_id }}
+          path: backup/
+          retention-days: 30
