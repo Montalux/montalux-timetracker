@@ -109,14 +109,34 @@ Alle aktiven Sessions bleiben bestehen. Neues Passwort gilt beim nächsten Login
 
 ## 5. Backups
 
-Supabase übernimmt Backups automatisch:
+Supabase Free Plan hat **keine** automatischen Backups. Deshalb läuft ein eigener Backup-Job via GitHub Actions.
 
-| Tier | Backup-Intervall | Aufbewahrung |
-|------|-------------------|--------------|
-| Free | Täglich | 7 Tage |
-| Pro  | Point-in-Time Recovery | 30 Tage |
+### Automatisch (GitHub Actions)
 
-Zusätzlich kann jederzeit manuell ein CSV-Export über die Buchungsübersicht gemacht werden.
+- **Wann:** Täglich um 02:00 UTC (03:00 / 04:00 CH-Zeit)
+- **Was:** Exportiert alle 5 Tabellen (employees, customers, services, time_entries, material_entries) als JSON
+- **Wo:** GitHub Artifacts, 30 Tage aufbewahrt
+- **Workflow:** `.github/workflows/backup.yml`
+
+**Backups ansehen:**
+1. GitHub → Repository → **Actions** Tab
+2. Workflow "Daily Supabase Backup" auswählen
+3. Auf einen Run klicken → **Artifacts** Sektion → Download
+
+**Backup manuell auslösen:**
+1. GitHub → Actions → "Daily Supabase Backup"
+2. Rechts oben: **"Run workflow"** → **"Run workflow"**
+
+**Benötigte GitHub Secrets:**
+
+| Secret | Wert | Wo zu finden |
+|--------|------|--------------|
+| `SUPABASE_URL` | `https://xxx.supabase.co` | Supabase → Settings → API → Project URL |
+| `SUPABASE_SERVICE_KEY` | `sb_secret_...` | Supabase → Settings → API Keys → Secret key |
+
+### Manuell (CSV-Export)
+
+Zusätzlich kann jederzeit ein CSV-Export über die Buchungsübersicht in der App gemacht werden.
 
 ---
 
