@@ -8,7 +8,6 @@ export default function BookingPage() {
   const { services } = useServices()
 
   const [activeTab, setActiveTab] = useState<'time' | 'material'>('time')
-  const [durationMode, setDurationMode] = useState<'manual' | 'timer'>('manual')
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Shared state
@@ -31,6 +30,15 @@ export default function BookingPage() {
 
   const timer = useTimer(employeeId)
 
+  // When timer stops, fill result into custom minutes
+  useEffect(() => {
+    if (timer.status === 'stopped' && timer.resultMinutes) {
+      setCustomMinutes(timer.resultMinutes.toString())
+      setDurationMinutes(null)
+      timer.reset()
+    }
+  }, [timer.status, timer.resultMinutes])
+
   // Restore employee from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('selectedEmployee')
@@ -50,23 +58,16 @@ export default function BookingPage() {
   const handleTimeSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (timer.status === 'running') {
+      showFlash('error', 'Bitte zuerst den Timer stoppen.')
+      return
+    }
+
     let minutes = durationMinutes
-    if (durationMode === 'timer') {
-      if (timer.status === 'running') {
-        showFlash('error', 'Bitte zuerst den Timer stoppen.')
-        return
-      }
-      if (timer.status !== 'stopped' || !timer.resultMinutes) {
-        showFlash('error', 'Bitte den Timer starten und stoppen, um eine Dauer zu erfassen.')
-        return
-      }
-      minutes = timer.resultMinutes
-    } else {
-      if (customMinutes) minutes = parseInt(customMinutes)
-      if (!minutes || minutes <= 0) {
-        showFlash('error', 'Bitte eine Dauer wählen oder eingeben.')
-        return
-      }
+    if (customMinutes) minutes = parseInt(customMinutes)
+    if (!minutes || minutes <= 0) {
+      showFlash('error', 'Bitte eine Dauer wählen oder eingeben.')
+      return
     }
 
     const { error } = await addTimeEntry({
@@ -137,17 +138,17 @@ export default function BookingPage() {
         )}
 
         {/* Tab Toggle */}
-        <div role="tablist" className="tabs tabs-boxed mb-6">
+        <div className="join w-full mb-6">
           <button
-            role="tab"
-            className={`tab ${activeTab === 'time' ? 'tab-active' : ''}`}
+            type="button"
+            className={`join-item btn btn-lg flex-1 ${activeTab === 'time' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setActiveTab('time')}
           >
             Zeitbuchung
           </button>
           <button
-            role="tab"
-            className={`tab ${activeTab === 'material' ? 'tab-active' : ''}`}
+            type="button"
+            className={`join-item btn btn-lg flex-1 ${activeTab === 'material' ? 'btn-primary' : 'btn-outline'}`}
             onClick={() => setActiveTab('material')}
           >
             Materialbuchung
@@ -190,59 +191,44 @@ export default function BookingPage() {
               <div className="form-control w-full md:col-span-2">
                 <label className="label"><span className="label-text">Dauer *</span></label>
 
-                <div className="tabs tabs-boxed mb-3 w-fit">
-                  <button type="button" className={`tab tab-sm ${durationMode === 'manual' ? 'tab-active' : ''}`} onClick={() => setDurationMode('manual')}>Manuell</button>
-                  <button type="button" className={`tab tab-sm ${durationMode === 'timer' ? 'tab-active' : ''}`} onClick={() => setDurationMode('timer')}>Timer</button>
+                <div className="flex gap-2 flex-wrap items-center">
+                  {[5, 15, 30, 60].map(min => (
+                    <button
+                      key={min}
+                      type="button"
+                      className={`btn ${durationMinutes === min && !customMinutes ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => { setDurationMinutes(min); setCustomMinutes('') }}
+                    >
+                      {min >= 60 ? `${min / 60} h` : `${min} min`}
+                    </button>
+                  ))}
+                  <span className="text-base-content/40">|</span>
+                  <input
+                    type="number"
+                    className="input input-bordered w-28"
+                    min="1"
+                    placeholder="min"
+                    value={customMinutes}
+                    onChange={e => { setCustomMinutes(e.target.value); setDurationMinutes(null) }}
+                  />
+                  <span className="text-base-content/40">|</span>
+                  {timer.status === 'idle' && (
+                    <button type="button" className="btn btn-success" onClick={() => {
+                      if (!employeeId) { showFlash('error', 'Bitte zuerst einen Mitarbeiter wählen.'); return }
+                      timer.start()
+                    }}>
+                      Timer starten
+                    </button>
+                  )}
+                  {timer.status === 'running' && (
+                    <div className="flex items-center gap-2">
+                      <div className="text-xl font-mono font-bold tabular-nums text-success">{timer.displayTime}</div>
+                      <button type="button" className="btn btn-error btn-sm" onClick={() => {
+                        timer.stop()
+                      }}>Stopp</button>
+                    </div>
+                  )}
                 </div>
-
-                {durationMode === 'manual' ? (
-                  <div className="flex gap-2 flex-wrap items-center">
-                    {[5, 15, 30, 60].map(min => (
-                      <button
-                        key={min}
-                        type="button"
-                        className={`btn ${durationMinutes === min && !customMinutes ? 'btn-primary' : 'btn-outline'}`}
-                        onClick={() => { setDurationMinutes(min); setCustomMinutes('') }}
-                      >
-                        {min >= 60 ? `${min / 60} h` : `${min} min`}
-                      </button>
-                    ))}
-                    <span className="text-base-content/40">|</span>
-                    <input
-                      type="number"
-                      className="input input-bordered w-28"
-                      min="1"
-                      placeholder="min"
-                      value={customMinutes}
-                      onChange={e => { setCustomMinutes(e.target.value); setDurationMinutes(null) }}
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    {timer.status === 'idle' && (
-                      <button type="button" className="btn btn-success btn-lg" onClick={() => {
-                        if (!employeeId) { showFlash('error', 'Bitte zuerst einen Mitarbeiter wählen.'); return }
-                        timer.start()
-                      }}>
-                        ▶ Timer starten
-                      </button>
-                    )}
-                    {timer.status === 'running' && (
-                      <div className="flex items-center gap-4">
-                        <div className="text-3xl font-mono font-bold tabular-nums">{timer.displayTime}</div>
-                        <button type="button" className="btn btn-error" onClick={timer.stop}>⏹ Stopp</button>
-                      </div>
-                    )}
-                    {timer.status === 'stopped' && timer.resultMinutes && (
-                      <div className="flex items-center gap-3">
-                        <div className="badge badge-lg badge-success gap-1">
-                          {timer.resultMinutes} Minute{timer.resultMinutes !== 1 ? 'n' : ''} erfasst
-                        </div>
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={timer.reset}>Verwerfen</button>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
 
               <div className="form-control w-full md:col-span-2">
@@ -277,9 +263,14 @@ export default function BookingPage() {
                 </select>
               </div>
 
-              <div className="form-control w-full md:col-span-2">
+              <div className="form-control w-full">
                 <label className="label"><span className="label-text">Material-Beschreibung *</span></label>
                 <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="input input-bordered w-full" placeholder="z.B. Papier, Couverts..." required />
+              </div>
+
+              <div className="form-control w-full">
+                <label className="label"><span className="label-text">Datum *</span></label>
+                <input type="date" value={dateMaterial} onChange={e => setDateMaterial(e.target.value)} className="input input-bordered w-full" required />
               </div>
 
               <div className="form-control w-full">
@@ -292,12 +283,7 @@ export default function BookingPage() {
                 <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="input input-bordered w-full" step="0.01" min="0" placeholder="z.B. 45.50" />
               </div>
 
-              <div className="form-control w-full">
-                <label className="label"><span className="label-text">Datum *</span></label>
-                <input type="date" value={dateMaterial} onChange={e => setDateMaterial(e.target.value)} className="input input-bordered w-full" required />
-              </div>
-
-              <div className="form-control w-full">
+              <div className="form-control w-full md:col-span-2">
                 <label className="label"><span className="label-text">Notiz</span></label>
                 <textarea value={noteMaterial} onChange={e => setNoteMaterial(e.target.value)} className="textarea textarea-bordered w-full" rows={2} placeholder="Optionale Bemerkung..." />
               </div>

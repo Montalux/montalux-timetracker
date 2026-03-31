@@ -18,7 +18,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        const rememberMe = localStorage.getItem('rememberMe')
+        const currentSession = sessionStorage.getItem('currentSession')
+        if (rememberMe === 'false' && !currentSession) {
+          await supabase.auth.signOut()
+          setSession(null)
+          setLoading(false)
+          return
+        }
+      }
       setSession(session)
       setLoading(false)
     })

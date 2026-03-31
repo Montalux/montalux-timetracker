@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [rememberMe, setRememberMe] = useState(true)
   const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
@@ -18,6 +19,8 @@ export default function LoginPage() {
     setError('')
     const success = await login(password)
     if (success) {
+      localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false')
+      if (!rememberMe) sessionStorage.setItem('currentSession', 'true')
       navigate('/', { replace: true })
     } else {
       setError('Falsches Passwort.')
@@ -47,7 +50,18 @@ export default function LoginPage() {
                 autoFocus
               />
             </div>
-            <div className="form-control mt-4">
+            <div className="form-control mt-3">
+              <label className="label cursor-pointer justify-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="checkbox checkbox-sm checkbox-primary"
+                />
+                <span className="label-text">Auf diesem Computer merken</span>
+              </label>
+            </div>
+            <div className="form-control mt-2">
               <button type="submit" className="btn btn-primary w-full">Anmelden</button>
             </div>
           </form>
