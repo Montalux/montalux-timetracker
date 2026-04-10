@@ -80,17 +80,16 @@ function AdminSection<T extends { id: number; name: string; active: boolean; pri
                     </div>
                   )}
                   <div className="flex justify-end gap-2">
-                    <button type="submit" className="btn btn-ghost btn-xs">Speichern</button>
+                    <button
+                      type="button"
+                      onClick={() => onToggle(item)}
+                      className={`btn btn-outline btn-xs ${item.active ? 'btn-error' : 'btn-success'}`}
+                    >
+                      {item.active ? 'Deaktivieren' : 'Aktivieren'}
+                    </button>
+                    <button type="submit" className="btn btn-primary btn-xs">Speichern</button>
                   </div>
                 </form>
-                <div className="flex justify-end mt-1">
-                  <button
-                    onClick={() => onToggle(item)}
-                    className={`btn btn-outline btn-xs ${item.active ? 'btn-error' : 'btn-success'}`}
-                  >
-                    {item.active ? 'Deaktivieren' : 'Aktivieren'}
-                  </button>
-                </div>
               </div>
             ))}
           </div>
