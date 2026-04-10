@@ -45,8 +45,11 @@ export interface CombinedEntry {
   type: 'time' | 'material'
   date: string
   employee: string
+  employee_id: number
   customer: string
+  customer_id: number
   service: string | null
+  service_id: number | null
   duration_minutes: number | null
   price_per_hour: number | null
   amount: number | null

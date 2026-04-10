@@ -103,9 +103,13 @@ function AdminSection<T extends { id: number; name: string; active: boolean; pri
 }
 
 export default function AdminPage() {
-  const { employees, refetch: refetchEmp } = useEmployees(false)
-  const { customers, refetch: refetchCust } = useCustomers(false)
-  const { services, refetch: refetchSvc } = useServices(false)
+  const { employees, loading: loadingEmp, refetch: refetchEmp } = useEmployees(false)
+  const { customers, loading: loadingCust, refetch: refetchCust } = useCustomers(false)
+  const { services, loading: loadingSvc, refetch: refetchSvc } = useServices(false)
+
+  if (loadingEmp || loadingCust || loadingSvc) {
+    return <div className="flex justify-center py-12"><span className="loading loading-spinner loading-lg" /></div>
+  }
 
   return (
     <>

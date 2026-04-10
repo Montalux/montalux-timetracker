@@ -3,9 +3,9 @@ import { useEmployees, useCustomers, useServices, addTimeEntry, addMaterialEntry
 import { useTimer } from '../hooks/useTimer'
 
 export default function BookingPage() {
-  const { employees } = useEmployees()
-  const { customers } = useCustomers()
-  const { services } = useServices()
+  const { employees, loading: loadingEmp } = useEmployees()
+  const { customers, loading: loadingCust } = useCustomers()
+  const { services, loading: loadingSvc } = useServices()
 
   const [activeTab, setActiveTab] = useState<'time' | 'material'>('time')
   const [flash, setFlash] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -112,6 +112,10 @@ export default function BookingPage() {
       setAmount('')
       setNoteMaterial('')
     }
+  }
+
+  if (loadingEmp || loadingCust || loadingSvc) {
+    return <div className="flex justify-center py-12"><span className="loading loading-spinner loading-lg" /></div>
   }
 
   if (!employees.length) {

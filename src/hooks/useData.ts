@@ -73,7 +73,7 @@ export function useEntries(filters: EntryFilters) {
     if (filters.type !== 'material') {
       let query = supabase
         .from('time_entries')
-        .select('id, date, duration_minutes, note, created_at, employees(name), customers(name), services(name, price_per_hour)')
+        .select('id, employee_id, customer_id, service_id, date, duration_minutes, note, created_at, employees(name), customers(name), services(name, price_per_hour)')
 
       if (filters.employee_id) query = query.eq('employee_id', filters.employee_id)
       if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
@@ -91,8 +91,11 @@ export function useEntries(filters: EntryFilters) {
             type: 'time',
             date: row.date,
             employee: emp?.name || '',
+            employee_id: row.employee_id,
             customer: cust?.name || '',
+            customer_id: row.customer_id,
             service: svc?.name || null,
+            service_id: row.service_id,
             duration_minutes: row.duration_minutes,
             price_per_hour: svc?.price_per_hour || null,
             amount: svc ? Math.round(row.duration_minutes / 60 * svc.price_per_hour * 100) / 100 : null,
@@ -107,7 +110,7 @@ export function useEntries(filters: EntryFilters) {
     if (filters.type !== 'time') {
       let query = supabase
         .from('material_entries')
-        .select('id, date, description, quantity, amount, note, created_at, employees(name), customers(name)')
+        .select('id, employee_id, customer_id, date, description, quantity, amount, note, created_at, employees(name), customers(name)')
 
       if (filters.employee_id) query = query.eq('employee_id', filters.employee_id)
       if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
@@ -124,8 +127,11 @@ export function useEntries(filters: EntryFilters) {
             type: 'material',
             date: row.date,
             employee: emp?.name || '',
+            employee_id: row.employee_id,
             customer: cust?.name || '',
+            customer_id: row.customer_id,
             service: null,
+            service_id: null,
             duration_minutes: null,
             price_per_hour: null,
             amount: row.amount,
@@ -159,6 +165,20 @@ export async function addMaterialEntry(data: {
   description: string; quantity: number; amount: number; note?: string
 }) {
   return supabase.from('material_entries').insert(data)
+}
+
+export async function updateTimeEntry(id: number, data: {
+  employee_id: number; customer_id: number; service_id: number;
+  date: string; duration_minutes: number; note?: string
+}) {
+  return supabase.from('time_entries').update(data).eq('id', id)
+}
+
+export async function updateMaterialEntry(id: number, data: {
+  employee_id: number; customer_id: number; date: string;
+  description: string; quantity: number; amount: number; note?: string
+}) {
+  return supabase.from('material_entries').update(data).eq('id', id)
 }
 
 export async function deleteTimeEntry(id: number) {

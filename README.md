@@ -1,65 +1,76 @@
 # Montalux Timetracker
 
-Einfache Zeiterfassungs-App für Montalux. Erfasst Zeit- und Materialbuchungen pro Mitarbeiter und Kunde.
+Zeiterfassungs-App für Montalux. Erfasst Zeit- und Materialbuchungen pro Mitarbeiter und Kunde.
 
-Live: **[Montalux.pythonanywhere.com](https://Montalux.pythonanywhere.com)**
+Live: **[https://pascalmueller.github.io/montalux-timetracker/](https://pascalmueller.github.io/montalux-timetracker/)**
 
 ## Features
 
 - **Zeitbuchung** mit manueller Dauer (5/15/30/60 min oder freie Eingabe) oder Start/Stop-Timer
 - **Materialbuchung** mit Menge und Betrag
 - **Timer-Modus** mit Live-Anzeige, localStorage-Persistenz und automatischer Wiederherstellung
-- **Übersicht** aller Buchungen mit Filtern (Mitarbeiter, Kunde, Datum, Typ)
+- **Buchungsübersicht** aller Einträge mit Filtern (Mitarbeiter, Kunde, Datum, Typ)
+- **Bearbeiten** bestehender Buchungen (alle Felder: Datum, Dauer, Person, Kunde, Leistung, Notiz, etc.)
 - **CSV-Export** der gefilterten Einträge
 - **Verwaltung** von Mitarbeitern, Kunden und Leistungen (mit Aktivierung/Deaktivierung)
-- **Passwortschutz** — gemeinsames Passwort für das Team
-- **Automatische Backups** der SQLite-Datenbank (täglich, max. 15)
-- **CSRF-Schutz** auf allen Formularen
+- **Passwortschutz** — gemeinsames Passwort für das Team, mit Remember-me-Option
+- **Automatische Backups** der Supabase-Datenbank via GitHub Actions (täglich)
+- **Loading-Spinner** für flüssiges UX trotz Supabase-Latenz
 
 ## Tech-Stack
 
-- Python / Flask
-- SQLite (WAL-Modus, mit Indexes)
-- Tailwind CSS + DaisyUI
-- Vanilla JavaScript
-- flask-wtf (CSRF)
-- pytest (19 Tests)
+- React 19 + TypeScript
+- Vite
+- React Router
+- Supabase (PostgreSQL, Row Level Security)
+- Tailwind CSS 4 + daisyUI 5
+- GitHub Pages (Hosting)
+- GitHub Actions (CI/CD + Backup)
 
 ## Lokale Entwicklung
 
 ```bash
-pip install -r requirements.txt
-python3 app.py
+npm install
 ```
 
-Die App läuft auf **http://localhost:5001** mit dem Standard-Passwort `montalux`.
+Umgebungsvariablen in `.env.local` setzen:
 
-Umgebungsvariablen setzen für Produktion:
-
-```bash
-SECRET_KEY="ein-sicherer-string" APP_PASSWORD="euer-passwort" python3 app.py
+```
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=xxx
+VITE_APP_PASSWORD=xxx
 ```
 
-## Tests
+```bash
+npm run dev
+```
+
+Die App läuft auf **http://localhost:5173/montalux-timetracker/**
+
+## Build
 
 ```bash
-python3 -m pytest test_app.py -v
+npm run build
 ```
 
 ## Deployment
 
-Die App läuft auf **PythonAnywhere** (Free Tier). Siehe [DEPLOY.md](DEPLOY.md) für die vollständige Anleitung.
+Die App wird automatisch via **GitHub Actions** auf **GitHub Pages** deployed, sobald auf `main` gepusht wird.
 
-### Quick-Update
+Benötigte Repository-Secrets:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_APP_PASSWORD`
 
-```bash
-# Lokal
-git add -A && git commit -m "Änderung" && git push
+## Datenbank
 
-# Auf PythonAnywhere (Bash-Console)
-cd ~/timetracker && git pull
-# Dann Web-Tab → Reload
-```
+PostgreSQL via Supabase. Schema in `supabase/migrations/`. Tabellen:
+
+- `employees` — Mitarbeiter
+- `customers` — Kunden
+- `services` — Leistungen mit Stundenansatz
+- `time_entries` — Zeitbuchungen
+- `material_entries` — Materialbuchungen
 
 ## Erster Start
 

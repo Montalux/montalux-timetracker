@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useEmployees, useCustomers, useEntries, deleteTimeEntry, deleteMaterialEntry } from '../hooks/useData'
 import type { CombinedEntry } from '../types/database'
+import EditEntryModal from '../components/EditEntryModal'
 
 export default function EntriesPage() {
   const { employees } = useEmployees(false)
@@ -11,6 +12,8 @@ export default function EntriesPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [type, setType] = useState('')
+
+  const [editingEntry, setEditingEntry] = useState<CombinedEntry | null>(null)
 
   const [appliedFilters, setAppliedFilters] = useState<{
     employee_id?: number; customer_id?: number;
@@ -176,7 +179,8 @@ export default function EntriesPage() {
                         {entry.amount != null ? `${entry.amount.toFixed(2)} CHF` : ''}
                       </td>
                       <td className="max-w-xs truncate">{entry.note || ''}</td>
-                      <td>
+                      <td className="flex gap-1">
+                        <button onClick={() => setEditingEntry(entry)} className="btn btn-ghost btn-xs">&#9998;</button>
                         <button onClick={() => handleDelete(entry)} className="btn btn-ghost btn-xs text-error">X</button>
                       </td>
                     </tr>
@@ -204,6 +208,12 @@ export default function EntriesPage() {
           <button onClick={exportCSV} className="btn btn-sm btn-outline">CSV exportieren</button>
         </div>
       )}
+
+      <EditEntryModal
+        entry={editingEntry}
+        onClose={() => setEditingEntry(null)}
+        onSaved={() => { setEditingEntry(null); refetch() }}
+      />
     </>
   )
 }
