@@ -77,3 +77,7 @@ PostgreSQL via Supabase. Schema in `supabase/migrations/`. Tabellen:
 1. App öffnen und mit Team-Passwort anmelden
 2. Unter "Verwaltung" Mitarbeiter, Kunden und Leistungen anlegen
 3. Auf der Startseite Buchungen erfassen
+
+## Changelog
+
+Siehe [CHANGELOG.md](CHANGELOG.md).
