@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useEmployees, useCustomers, useEntries, deleteTimeEntry, deleteMaterialEntry } from '../hooks/useData'
+import { useFlash } from '../hooks/useFlash'
 import type { CombinedEntry } from '../types/database'
 import EditEntryModal from '../components/EditEntryModal'
 
@@ -14,6 +15,7 @@ export default function EntriesPage() {
   const [type, setType] = useState('')
 
   const [editingEntry, setEditingEntry] = useState<CombinedEntry | null>(null)
+  const { flash, show, dismiss } = useFlash()
 
   const [appliedFilters, setAppliedFilters] = useState<{
     employee_id?: number; customer_id?: number;
@@ -47,12 +49,19 @@ export default function EntriesPage() {
 
   const handleDelete = async (entry: CombinedEntry) => {
     if (!confirm('Buchung wirklich löschen?')) return
-    if (entry.type === 'time') {
-      await deleteTimeEntry(entry.id)
-    } else {
-      await deleteMaterialEntry(entry.id)
+    try {
+      const { error } = entry.type === 'time'
+        ? await deleteTimeEntry(entry.id)
+        : await deleteMaterialEntry(entry.id)
+      if (error) {
+        show('error', `Löschen fehlgeschlagen: ${error.message}`)
+        return
+      }
+      show('success', 'Buchung gelöscht.')
+      refetch()
+    } catch (err) {
+      show('error', `Löschen fehlgeschlagen: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`)
     }
-    refetch()
   }
 
   const formatDuration = (minutes: number) => {
@@ -80,8 +89,19 @@ export default function EntriesPage() {
       }
     })
 
-    const csv = [headers, ...rows].map(row => row.join(';')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    // Escape CSV cell: neutralize formula-injection prefix, wrap always in quotes,
+    // double internal quotes. Always quoting also handles ;, newlines and commas safely.
+    const escapeCell = (value: unknown): string => {
+      const s = value == null ? '' : String(value)
+      const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+      return `"${safe.replace(/"/g, '""')}"`
+    }
+
+    const csv = [headers, ...rows]
+      .map(row => row.map(escapeCell).join(';'))
+      .join('\r\n')
+    // BOM so Excel detects UTF-8 (umlauts in Notiz/Mitarbeiter-Namen)
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -92,6 +112,13 @@ export default function EntriesPage() {
 
   return (
     <>
+      {flash && (
+        <div className={`alert ${flash.kind === 'success' ? 'alert-success' : 'alert-error'} mb-4`}>
+          <span>{flash.text}</span>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={dismiss} aria-label="Meldung schließen">X</button>
+        </div>
+      )}
+
       {/* Filter */}
       <div className="card bg-base-100 shadow-md mb-6">
         <div className="card-body">
@@ -180,8 +207,8 @@ export default function EntriesPage() {
                       </td>
                       <td className="max-w-xs truncate">{entry.note || ''}</td>
                       <td className="flex gap-1">
-                        <button onClick={() => setEditingEntry(entry)} className="btn btn-ghost btn-xs">&#9998;</button>
-                        <button onClick={() => handleDelete(entry)} className="btn btn-ghost btn-xs text-error">X</button>
+                        <button onClick={() => setEditingEntry(entry)} className="btn btn-ghost btn-xs" aria-label="Buchung bearbeiten" title="Bearbeiten">&#9998;</button>
+                        <button onClick={() => handleDelete(entry)} className="btn btn-ghost btn-xs text-error" aria-label="Buchung löschen" title="Löschen">X</button>
                       </td>
                     </tr>
                   ))}

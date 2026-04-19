@@ -19,33 +19,70 @@ export function useTimer(employeeId: string) {
     }
   }, [])
 
+  // Reads + validates the persisted timer. Returns null if missing, malformed,
+  // or holds an unusable startedAt — and removes the bad entry so a stale value
+  // can't keep the UI in 'running' forever.
+  const readStartedAt = useCallback((key: string): number | null => {
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    try {
+      const data = JSON.parse(raw) as { startedAt?: unknown }
+      const ts = typeof data.startedAt === 'string' ? Date.parse(data.startedAt) : NaN
+      if (!Number.isFinite(ts)) {
+        localStorage.removeItem(key)
+        return null
+      }
+      return ts
+    } catch {
+      localStorage.removeItem(key)
+      return null
+    }
+  }, [])
+
   const updateDisplay = useCallback(() => {
     if (!storageKey) return
-    const raw = localStorage.getItem(storageKey)
-    if (!raw) return
-    const data = JSON.parse(raw)
-    const elapsed = Math.floor((Date.now() - new Date(data.startedAt).getTime()) / 1000)
+    const startedAt = readStartedAt(storageKey)
+    if (startedAt == null) {
+      clearTimerInterval()
+      setState({ status: 'idle', elapsedSeconds: 0, resultMinutes: null })
+      return
+    }
+    const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
     setState(prev => ({ ...prev, elapsedSeconds: elapsed }))
-  }, [storageKey])
+  }, [storageKey, readStartedAt, clearTimerInterval])
 
   const start = useCallback(() => {
     if (!storageKey) return
     const data = { startedAt: new Date().toISOString(), employeeId }
-    localStorage.setItem(storageKey, JSON.stringify(data))
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(data))
+    } catch {
+      // localStorage full or disabled (private mode) — abort start so we don't
+      // show 'running' UI without persistence backing it.
+      return
+    }
     setState({ status: 'running', elapsedSeconds: 0, resultMinutes: null })
   }, [storageKey, employeeId])
 
   const stop = useCallback(() => {
     if (!storageKey) return
-    const raw = localStorage.getItem(storageKey)
-    if (!raw) return
-    const data = JSON.parse(raw)
-    const elapsed = Date.now() - new Date(data.startedAt).getTime()
-    const minutes = Math.max(1, Math.ceil(elapsed / 60000))
+    const startedAt = readStartedAt(storageKey)
     localStorage.removeItem(storageKey)
     clearTimerInterval()
+    if (startedAt == null) {
+      // Corrupt entry was removed by readStartedAt. No usable duration —
+      // bail to idle rather than persist a bogus value.
+      setState({ status: 'idle', elapsedSeconds: 0, resultMinutes: null })
+      return
+    }
+    const elapsedMs = Date.now() - startedAt
+    if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
+      setState({ status: 'idle', elapsedSeconds: 0, resultMinutes: null })
+      return
+    }
+    const minutes = Math.max(1, Math.ceil(elapsedMs / 60000))
     setState({ status: 'stopped', elapsedSeconds: 0, resultMinutes: minutes })
-  }, [storageKey, clearTimerInterval])
+  }, [storageKey, readStartedAt, clearTimerInterval])
 
   const reset = useCallback(() => {
     if (storageKey) localStorage.removeItem(storageKey)
@@ -60,13 +97,13 @@ export function useTimer(employeeId: string) {
       setState({ status: 'idle', elapsedSeconds: 0, resultMinutes: null })
       return
     }
-    const raw = localStorage.getItem(storageKey)
-    if (raw) {
-      setState({ status: 'running', elapsedSeconds: 0, resultMinutes: null })
-    } else {
-      setState({ status: 'idle', elapsedSeconds: 0, resultMinutes: null })
-    }
-  }, [storageKey, clearTimerInterval])
+    const startedAt = readStartedAt(storageKey)
+    setState({
+      status: startedAt != null ? 'running' : 'idle',
+      elapsedSeconds: 0,
+      resultMinutes: null,
+    })
+  }, [storageKey, clearTimerInterval, readStartedAt])
 
   // Tick interval when running
   useEffect(() => {

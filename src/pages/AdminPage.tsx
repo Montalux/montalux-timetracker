@@ -5,6 +5,7 @@ import {
   addCustomer, updateCustomer, toggleCustomer,
   addService, updateService, toggleService,
 } from '../hooks/useData'
+import { useFlash } from '../hooks/useFlash'
 
 interface AdminSectionProps<T extends { id: number; name: string; active: boolean }> {
   title: string
@@ -105,6 +106,27 @@ export default function AdminPage() {
   const { employees, loading: loadingEmp, refetch: refetchEmp } = useEmployees(false)
   const { customers, loading: loadingCust, refetch: refetchCust } = useCustomers(false)
   const { services, loading: loadingSvc, refetch: refetchSvc } = useServices(false)
+  const { flash, show, dismiss } = useFlash()
+
+  // Wraps a Supabase mutation: surfaces errors as a toast instead of swallowing
+  // them, refetches only on success so the UI doesn't reflect a failed write.
+  const guard = async (
+    label: string,
+    op: () => Promise<{ error: { message: string } | null }>,
+    refetch: () => void,
+  ) => {
+    try {
+      const { error } = await op()
+      if (error) {
+        show('error', `${label}: ${error.message}`)
+      } else {
+        show('success', `${label} gespeichert.`)
+        refetch()
+      }
+    } catch (err) {
+      show('error', `${label}: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`)
+    }
+  }
 
   if (loadingEmp || loadingCust || loadingSvc) {
     return <div className="flex justify-center py-12"><span className="loading loading-spinner loading-lg" /></div>
@@ -113,31 +135,39 @@ export default function AdminPage() {
   return (
     <>
       <h2 className="text-2xl font-bold mb-6">Verwaltung</h2>
+
+      {flash && (
+        <div className={`alert ${flash.kind === 'success' ? 'alert-success' : 'alert-error'} mb-4`}>
+          <span>{flash.text}</span>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={dismiss} aria-label="Meldung schließen">X</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <AdminSection
           title="Mitarbeiter"
           items={employees}
           addPlaceholder="Neuer Mitarbeiter..."
-          onAdd={async (name) => { await addEmployee(name); refetchEmp() }}
-          onUpdate={async (item, name) => { await updateEmployee(item.id, name, item.active); refetchEmp() }}
-          onToggle={async (item) => { await toggleEmployee(item.id, item.active); refetchEmp() }}
+          onAdd={(name) => guard('Mitarbeiter', () => addEmployee(name), refetchEmp)}
+          onUpdate={(item, name) => guard('Mitarbeiter', () => updateEmployee(item.id, name, item.active), refetchEmp)}
+          onToggle={(item) => guard('Mitarbeiter', () => toggleEmployee(item.id, item.active), refetchEmp)}
         />
         <AdminSection
           title="Kunden"
           items={customers}
           addPlaceholder="Neuer Kunde..."
-          onAdd={async (name) => { await addCustomer(name); refetchCust() }}
-          onUpdate={async (item, name) => { await updateCustomer(item.id, name, item.active); refetchCust() }}
-          onToggle={async (item) => { await toggleCustomer(item.id, item.active); refetchCust() }}
+          onAdd={(name) => guard('Kunde', () => addCustomer(name), refetchCust)}
+          onUpdate={(item, name) => guard('Kunde', () => updateCustomer(item.id, name, item.active), refetchCust)}
+          onToggle={(item) => guard('Kunde', () => toggleCustomer(item.id, item.active), refetchCust)}
         />
         <AdminSection
           title="Leistungen"
           items={services}
           addPlaceholder="Neue Leistung..."
           showPrice
-          onAdd={async (name, price) => { await addService(name, price!); refetchSvc() }}
-          onUpdate={async (item, name, price) => { await updateService(item.id, name, price!, item.active); refetchSvc() }}
-          onToggle={async (item) => { await toggleService(item.id, item.active); refetchSvc() }}
+          onAdd={(name, price) => guard('Leistung', () => addService(name, price!), refetchSvc)}
+          onUpdate={(item, name, price) => guard('Leistung', () => updateService(item.id, name, price!, item.active), refetchSvc)}
+          onToggle={(item) => guard('Leistung', () => toggleService(item.id, item.active), refetchSvc)}
         />
       </div>
     </>
