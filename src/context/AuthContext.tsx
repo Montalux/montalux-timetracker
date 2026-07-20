@@ -4,7 +4,7 @@ import type { Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
   isAuthenticated: boolean
-  login: (password: string) => Promise<boolean>
+  login: (password: string) => Promise<string | null>
   logout: () => Promise<void>
   loading: boolean
 }
@@ -40,12 +40,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const login = async (password: string): Promise<boolean> => {
+  const login = async (password: string): Promise<string | null> => {
     const { error } = await supabase.auth.signInWithPassword({
       email: TEAM_EMAIL,
       password,
     })
-    return !error
+    return error ? error.message : null
   }
 
   const logout = async () => {

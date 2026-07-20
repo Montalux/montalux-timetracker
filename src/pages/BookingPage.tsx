@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useEmployees, useCustomers, useServices, addTimeEntry, addMaterialEntry } from '../hooks/useData'
 import { useTimer } from '../hooks/useTimer'
+import { todayLocal } from '../lib/date'
 
 export default function BookingPage() {
   const { employees, loading: loadingEmp } = useEmployees()
@@ -18,14 +19,14 @@ export default function BookingPage() {
   const [serviceId, setServiceId] = useState('')
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null)
   const [customMinutes, setCustomMinutes] = useState('')
-  const [dateTime, setDateTime] = useState(new Date().toISOString().split('T')[0])
+  const [dateTime, setDateTime] = useState(todayLocal())
   const [noteTime, setNoteTime] = useState('')
 
   // Material form
   const [description, setDescription] = useState('')
   const [quantity, setQuantity] = useState('')
   const [amount, setAmount] = useState('')
-  const [dateMaterial, setDateMaterial] = useState(new Date().toISOString().split('T')[0])
+  const [dateMaterial, setDateMaterial] = useState(todayLocal())
   const [noteMaterial, setNoteMaterial] = useState('')
 
   const timer = useTimer(employeeId)

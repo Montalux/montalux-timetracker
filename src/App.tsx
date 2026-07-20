@@ -7,7 +7,8 @@ import EntriesPage from './pages/EntriesPage'
 import AdminPage from './pages/AdminPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, loading } = useAuth()
+  if (loading) return <div className="flex justify-center py-12"><span className="loading loading-spinner loading-lg" /></div>
   if (!isAuthenticated) return <Navigate to="/login" replace />
   return <>{children}</>
 }

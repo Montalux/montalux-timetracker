@@ -3,6 +3,7 @@ import { useEmployees, useCustomers, useEntries, deleteTimeEntry, deleteMaterial
 import { useFlash } from '../hooks/useFlash'
 import type { CombinedEntry } from '../types/database'
 import EditEntryModal from '../components/EditEntryModal'
+import { todayLocal } from '../lib/date'
 
 export default function EntriesPage() {
   const { employees } = useEmployees(false)
@@ -105,7 +106,7 @@ export default function EntriesPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `zeiterfassung_${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `zeiterfassung_${todayLocal()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

@@ -44,7 +44,8 @@ export default function EditEntryModal({ entry, onClose, onSaved }: Props) {
     }
   }, [entry])
 
-  const handleSave = async () => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
     if (!entry) return
     setSaving(true)
     setError('')
@@ -93,6 +94,7 @@ export default function EditEntryModal({ entry, onClose, onSaved }: Props) {
           <div className="alert alert-error mb-4"><span>{error}</span></div>
         )}
 
+        <form onSubmit={handleSave}>
         {entry && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control w-full">
@@ -185,11 +187,12 @@ export default function EditEntryModal({ entry, onClose, onSaved }: Props) {
         )}
 
         <div className="modal-action">
-          <button className="btn" onClick={handleClose}>Abbrechen</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          <button type="button" className="btn" onClick={handleClose}>Abbrechen</button>
+          <button type="submit" className="btn btn-primary" disabled={saving}>
             {saving ? <span className="loading loading-spinner loading-sm" /> : 'Speichern'}
           </button>
         </div>
+        </form>
       </div>
       <form method="dialog" className="modal-backdrop"><button>close</button></form>
     </dialog>

@@ -20,13 +20,15 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    const success = await login(password)
-    if (success) {
+    const loginError = await login(password)
+    if (!loginError) {
       localStorage.setItem('rememberMe', rememberMe ? 'true' : 'false')
       if (!rememberMe) sessionStorage.setItem('currentSession', 'true')
       navigate('/', { replace: true })
-    } else {
+    } else if (loginError === 'Invalid login credentials') {
       setError('Falsches Passwort.')
+    } else {
+      setError(`Anmeldung fehlgeschlagen: ${loginError}`)
     }
   }
 

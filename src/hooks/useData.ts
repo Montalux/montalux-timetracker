@@ -62,6 +62,23 @@ interface EntryFilters {
   type?: string
 }
 
+// PostgREST caps a single response at 1000 rows by default. Page through
+// with .range() so tables past that size aren't silently truncated.
+const PAGE_SIZE = 1000
+
+async function fetchAllRows<T>(buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null }>): Promise<T[]> {
+  const all: T[] = []
+  let offset = 0
+  while (true) {
+    const { data } = await buildQuery(offset, offset + PAGE_SIZE - 1)
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < PAGE_SIZE) break
+    offset += PAGE_SIZE
+  }
+  return all
+}
+
 export function useEntries(filters: EntryFilters) {
   const [entries, setEntries] = useState<CombinedEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,75 +88,75 @@ export function useEntries(filters: EntryFilters) {
     const results: CombinedEntry[] = []
 
     if (filters.type !== 'material') {
-      let query = supabase
-        .from('time_entries')
-        .select('id, employee_id, customer_id, service_id, date, duration_minutes, note, created_at, employees(name), customers(name), services(name, price_per_hour)')
+      const data = await fetchAllRows((from, to) => {
+        let query = supabase
+          .from('time_entries')
+          .select('id, employee_id, customer_id, service_id, date, duration_minutes, note, created_at, employees(name), customers(name), services(name, price_per_hour)')
 
-      if (filters.employee_id) query = query.eq('employee_id', filters.employee_id)
-      if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
-      if (filters.date_from) query = query.gte('date', filters.date_from)
-      if (filters.date_to) query = query.lte('date', filters.date_to)
+        if (filters.employee_id) query = query.eq('employee_id', filters.employee_id)
+        if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
+        if (filters.date_from) query = query.gte('date', filters.date_from)
+        if (filters.date_to) query = query.lte('date', filters.date_to)
 
-      const { data } = await query
-      if (data) {
-        for (const row of data) {
-          const emp = row.employees as unknown as { name: string }
-          const cust = row.customers as unknown as { name: string }
-          const svc = row.services as unknown as { name: string; price_per_hour: number }
-          results.push({
-            id: row.id,
-            type: 'time',
-            date: row.date,
-            employee: emp?.name || '',
-            employee_id: row.employee_id,
-            customer: cust?.name || '',
-            customer_id: row.customer_id,
-            service: svc?.name || null,
-            service_id: row.service_id,
-            duration_minutes: row.duration_minutes,
-            price_per_hour: svc?.price_per_hour || null,
-            amount: svc ? Math.round(row.duration_minutes / 60 * svc.price_per_hour * 100) / 100 : null,
-            description: null,
-            quantity: null,
-            note: row.note,
-          })
-        }
+        return query.range(from, to)
+      })
+      for (const row of data) {
+        const emp = row.employees as unknown as { name: string }
+        const cust = row.customers as unknown as { name: string }
+        const svc = row.services as unknown as { name: string; price_per_hour: number }
+        results.push({
+          id: row.id,
+          type: 'time',
+          date: row.date,
+          employee: emp?.name || '',
+          employee_id: row.employee_id,
+          customer: cust?.name || '',
+          customer_id: row.customer_id,
+          service: svc?.name || null,
+          service_id: row.service_id,
+          duration_minutes: row.duration_minutes,
+          price_per_hour: svc?.price_per_hour || null,
+          amount: svc ? Math.round(row.duration_minutes / 60 * svc.price_per_hour * 100) / 100 : null,
+          description: null,
+          quantity: null,
+          note: row.note,
+        })
       }
     }
 
     if (filters.type !== 'time') {
-      let query = supabase
-        .from('material_entries')
-        .select('id, employee_id, customer_id, date, description, quantity, amount, note, created_at, employees(name), customers(name)')
+      const data = await fetchAllRows((from, to) => {
+        let query = supabase
+          .from('material_entries')
+          .select('id, employee_id, customer_id, date, description, quantity, amount, note, created_at, employees(name), customers(name)')
 
-      if (filters.employee_id) query = query.eq('employee_id', filters.employee_id)
-      if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
-      if (filters.date_from) query = query.gte('date', filters.date_from)
-      if (filters.date_to) query = query.lte('date', filters.date_to)
+        if (filters.employee_id) query = query.eq('employee_id', filters.employee_id)
+        if (filters.customer_id) query = query.eq('customer_id', filters.customer_id)
+        if (filters.date_from) query = query.gte('date', filters.date_from)
+        if (filters.date_to) query = query.lte('date', filters.date_to)
 
-      const { data } = await query
-      if (data) {
-        for (const row of data) {
-          const emp = row.employees as unknown as { name: string }
-          const cust = row.customers as unknown as { name: string }
-          results.push({
-            id: row.id,
-            type: 'material',
-            date: row.date,
-            employee: emp?.name || '',
-            employee_id: row.employee_id,
-            customer: cust?.name || '',
-            customer_id: row.customer_id,
-            service: null,
-            service_id: null,
-            duration_minutes: null,
-            price_per_hour: null,
-            amount: row.amount,
-            description: row.description,
-            quantity: row.quantity,
-            note: row.note,
-          })
-        }
+        return query.range(from, to)
+      })
+      for (const row of data) {
+        const emp = row.employees as unknown as { name: string }
+        const cust = row.customers as unknown as { name: string }
+        results.push({
+          id: row.id,
+          type: 'material',
+          date: row.date,
+          employee: emp?.name || '',
+          employee_id: row.employee_id,
+          customer: cust?.name || '',
+          customer_id: row.customer_id,
+          service: null,
+          service_id: null,
+          duration_minutes: null,
+          price_per_hour: null,
+          amount: row.amount,
+          description: row.description,
+          quantity: row.quantity,
+          note: row.note,
+        })
       }
     }
 
