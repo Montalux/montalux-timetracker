@@ -1,2 +1,13 @@
 @import "tailwindcss";
-@plugin "daisyui";
+/* daisyUI 5 only ships light/dark unless a theme is enabled here;
+   index.html asks for data-theme="cupcake" */
+@plugin "daisyui" {
+  themes: cupcake --default;
+}
+
+/* Cupcake is very round by default (pill buttons); tone it down (same values as montalux-crm) */
+:root[data-theme="cupcake"] {
+  --radius-selector: 0.25rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+}
